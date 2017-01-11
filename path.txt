@@ -1,1 +1,1 @@
-git://192.168.1.215/joinwe/zkp-pbms.git
+http://192.168.1.215:9090/r/joinwe/bacs.git

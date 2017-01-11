@@ -1,0 +1,5 @@
+# build_dependency_project
+
+读取path.txt文件中git地址并下载
+循环切换release分支代码进行maven编译发布到nexus
+解决项目构建依赖

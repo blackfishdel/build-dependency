@@ -11,7 +11,7 @@ BASEDIR=${WORKSPACE}/dependency
 BASEFILE=$(find ${WORKSPACE} -name dependency.txt | head -n 1)
 
 ###########################################
-#创建清单文件lib_explanation.sh
+#创建自删除文件lib_explanation.sh
 ###########################################
 echo "#!/bin/bash" > ${WORKSPACE}/lib_explanation.sh
 echo "###########################################" >> ${WORKSPACE}/lib_explanation.sh
@@ -64,25 +64,20 @@ do
 	#退出到主目录
 	cd ${BASEDIR}
 done < ${BASEFILE}
-
 echo "rm -f \${BASEDIR}/lib_explanation.sh" >> ${WORKSPACE}/lib_explanation.sh
+
 ###########################################
-#删除dependency文件夹
-#退回项目本身
+#删除dependency文件夹，退回项目本身，开始构建目标项目
 ###########################################
 rm -rf ${BASEDIR}
-
-###########################################
-#退回项目本身
-#开始构建目标项目
-###########################################
 cd ${WORKSPACE}
 mvn clean
+
 
 projectName=${project_name}
 moduleName=${module_name}
 branchName=${branch_name}
-lastTag=${project_tag}
+lastTag=${last_tag}
 
 excuteDir=$(find ${WORKSPACE} -name \\docker | head -n 1)
 moduleBase=${excuteDir%/*/*/*}
@@ -102,9 +97,7 @@ git pull origin ${branch_name}
 mvn deploy -Dmaven.test.skip=true
 
 ###########################################
-#抓取master分支的zip包
-#解压代码至master目录,并package
-#获取旧版本lib
+#抓取master分支的zip包，解压代码至master目录,并package，获取旧版本lib
 ###########################################
 cd ${buildDir}
 curl -o master.zip "http://192.168.1.215:9090/zip/?r=joinwe/"${projectName}".git&h=master&format=zip"
@@ -115,8 +108,8 @@ cd ${buildDir}/master/${moduleName}/target/${moduleName}/WEB-INF/lib
 oldLibs=(*)
 
 ###########################################
-#branch_name版本对比lastTag修改文件
-#compile,static,resource,pom
+#branch版本对比Tag版本生成修改文件列表，
+#compile,static,resource,pom。
 ###########################################
 cd ${WORKSPACE}
 compileFileList=$(git diff ${lastTag} HEAD --name-only | grep ${moduleName}** | grep **.java)
@@ -127,8 +120,7 @@ read -a array_static <<< ${staticFileList}
 read -a array_pom <<< ${pomFileList}
 
 #将修改的.pom应用到master dir
-for i in ${!array_pom[@]}
-do
+for i in ${!array_pom[@]};do
 	cp ${array_pom[$i]} ${buildDir}/master/${array_pom[$i]}
 done
 
@@ -149,17 +141,15 @@ mvn clean compile -Dmaven.test.skip=true
 
 ###########################################
 #提取master dir编译后的class文件到升级包
-#提取变更的静态文件到升级包 并覆盖至master dir代码
+#提取变更的静态文件到升级包,并覆盖至master dir代码
 ###########################################
 javaSuffix=.java
 classSuffix=.class
-for i in ${!array[@]}
-do
+for i in ${!array[@]};do
 	mkdir -p $(dirname ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15})
 	cp ${buildDir}/master/${moduleName}/target/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix
 done
-for i in ${!array_static[@]}
-do
+for i in ${!array_static[@]};do
 	mkdir -p $(dirname ${buildDir}/${moduleName}/${array_static[$i]:${#moduleName}+17})
 	cp ${WORKSPACE}/${array_static[$i]} ${buildDir}/${moduleName}/${array_static[$i]:${#moduleName}+17}
 	cp ${WORKSPACE}/${array_static[$i]} ${buildDir}/master/${array_static[$i]}
@@ -168,19 +158,19 @@ done
 ###########################################
 #提取变更的classes dir下的资源文件 并覆盖至master dir代码
 ###########################################
-for i in ${!array_resource[@]}
-do
+for i in ${!array_resource[@]};do
 	mkdir -p $(dirname ${buildDir}/${moduleName}/WEB-INF/classes/${array_resource[$i]:${#moduleName}+20})
 	cp ${WORKSPACE}/${array_resource[$i]} ${buildDir}/${moduleName}/WEB-INF/classes/${array_resource[$i]:${#moduleName}+20}
 	cp ${WORKSPACE}/${array_resource[$i]} ${buildDir}/master/${array_resource[$i]}
 done
 
 ###########################################
-#重新编译并打war包
+#master重新编译并打war包
 #将当前分支的docker目录覆盖至master代码
 #构建镜像推送至215服务器
 ###########################################
-cd ${buildDir}/${moduleName}
+
+cd ${buildDir}/master/${moduleName}
 mvn package -Dmaven.test.skip=true
 cp -r ${excuteDir} ${buildDir}/master/${moduleName}/src/main
 mvn docker:build -DpushImageTag 
@@ -188,10 +178,11 @@ mvn docker:build -DpushImageTag
 ###########################################
 #创建增量文件$moduleName.zip
 ###########################################
-#当前版本lib
-cd ${buildDir}/${moduleName}/target/${moduleName}/WEB-INF/lib
+#master版本lib
+cd ${buildDir}/master/${moduleName}/target/${moduleName}/WEB-INF/lib
 libs=(*)
 #对比新增jar
+
 difLibs=()
 for i in ${libs[@]}; do
 	skip=
@@ -207,7 +198,8 @@ for i in ${difLibs[@]}; do
 done
 mv ${WORKSPACE}/lib_explanation.sh ${buildDir}/${moduleName}/WEB-INF/lib/lib_explanation.sh
 #压缩增量dir
-zip -q ${buildDir}/${moduleName}".zip" ${buildDir}/${moduleName}
+cd ${buildDir}
+zip -r -q ${moduleName}".zip" ${moduleName}/*
 
 ###########################################
 #增量文件上传ftp
@@ -226,6 +218,6 @@ zip -q ${buildDir}/${moduleName}".zip" ${buildDir}/${moduleName}
 #!
 
 ###########################################
-#ssh无密码传文件
+#ssh无密码传文件，日志显示进度
 ###########################################
-scp ${buildDir}/${moduleName}".zip" root@192.168.1.215:/home/test-version/joinwe/${moduleName}".zip"
+scp -v ${buildDir}/${moduleName}".zip" root@192.168.1.215:/home/test-version/joinwe/${moduleName}".zip"

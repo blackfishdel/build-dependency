@@ -1,0 +1,7 @@
+#example--->project_name;branch_name;tag_name;git_path;build_type
+#‘;’分割符号,end作为尾行判断
+#build_type:create,deploy,delete
+#deploy:需要构建并打包上传到nexus的jar，解决依赖问题
+#delete:需要删除的jar文件全称,生成清单使用，该状态不需要tag和git_path,需要留空位置
+bacs;1.1.1-release;http://192.168.1.215:9090/r/joinwe/bacs.git;deploy
+end

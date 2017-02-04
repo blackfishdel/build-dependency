@@ -37,28 +37,28 @@ echo "cd \${BASEDIR}" >> ${WORKSPACE}/lib_explanation.sh
 ###########################################
 while read pathLine
 do
-	if [[ ${pathLine} == "end" && $(echo ${pathLine} | grep "#") != "" ]]
-	then
+	if [[ ${pathLine} == "end" || ${pathLine} =~ "#" ]];then
 		continue
 	fi
 	proName=`echo ${pathLine} | cut -d \; -f 1`
 	proBranch=`echo ${pathLine} | cut -d \; -f 2`
-	proTag=`echo ${pathLine} | cut -d \; -f 3`
-	proPath=`echo ${pathLine} | cut -d \; -f 4`
-	proType=`echo ${pathLine} | cut -d \; -f 5`
-	if [[ ${proType} == "deploy" ]]
-	then
+	proPath=`echo ${pathLine} | cut -d \; -f 3`
+	proType=`echo ${pathLine} | cut -d \; -f 4`
+	if [[ ${proType} == "deploy" ]];then
 		#git下载代码并更新
 		git clone ${proPath}
+		if [[ ${proName} =~ "/" ]];then
+			cd ${BASEDIR}/${proName%/*}
+		fi
 		#进入到子目录
-		cd $BASEDIR/${proName}
-		git checkout origin/${proBranch}
-		git pull origin ${proBranch}
+		git checkout ${proBranch}
+		git fetch
+		cd ${BASEDIR}/${proName}
 		echo ${branchName}"  打包发布该分支"
-		#调用mvn构建项目
-		mvn -Dmaven.test.skip=true clean deploy
-	elif [[ ${proName} != "/" && ${proName} != "" && ${proType} == "delete" ]]
-	then
+		#调用mvn构建项目,更新本地库，更新远端库
+		mvn -Dmaven.test.skip=true clean package install 
+		mvn -Dmaven.test.skip=true clean deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
+	elif [[ ${proName} != "/" && ${proName} != "" && ${proType} == "delete" ]];then
 		echo "rm -f "${proName} >> ${WORKSPACE}/lib_explanation.sh
 	fi
 	#退出到主目录
@@ -71,8 +71,7 @@ echo "rm -f \${BASEDIR}/lib_explanation.sh" >> ${WORKSPACE}/lib_explanation.sh
 ###########################################
 rm -rf ${BASEDIR}
 cd ${WORKSPACE}
-mvn clean
-
+mvn -Dmaven.test.skip=true clean
 
 projectName=${project_name}
 moduleName=${module_name}
@@ -81,10 +80,11 @@ lastTag=${last_tag}
 
 excuteDir=$(find ${WORKSPACE} -name \\docker | head -n 1)
 moduleBase=${excuteDir%/*/*/*}
+if [ ! -d ${moduleBase}"/target/build" ];then
+	rm -rf ${moduleBase}/target/build/*
+fi
+mkdir -p ${moduleBase}/target/build
 buildDir=${moduleBase}/target/build
-
-mkdir -p ${moduleBase}/target/build/
-rm -rf ${moduleBase}/target/build/*
 
 ###########################################
 #deploy到nexus使maven执行时能正确从nexus抓取依赖
@@ -94,7 +94,11 @@ git stash
 git fetch
 git checkout origin/${branch_name}
 git pull origin ${branch_name}
-mvn deploy -Dmaven.test.skip=true
+#调用mvn构建项目,更新本地库，更新远端库
+mvn -Dmaven.test.skip=true clean package install 
+mvn -Dmaven.test.skip=true clean deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
+rm -rf $(find ./ -name "*.war")
+rm -rf $(find ./ -name "*.jar")
 
 ###########################################
 #抓取master分支的zip包，解压代码至master目录,并package，获取旧版本lib
@@ -102,8 +106,16 @@ mvn deploy -Dmaven.test.skip=true
 cd ${buildDir}
 curl -o master.zip "http://192.168.1.215:9090/zip/?r=joinwe/"${projectName}".git&h=master&format=zip"
 unzip -q -d ${buildDir}/master master.zip
+rm -f master.zip
+if [[ ${moduleName}==${projectName} ]];then
+	mkdir ${buildDir}/master/${moduleName}
+	cd ${buildDir}/master
+	mv $(ls |grep -v ${moduleName}) ${buildDir}/master/${moduleName}
+fi
 cd ${buildDir}/master/${moduleName}
-mvn package -Dmaven.test.skip=true
+#调用mvn构建项目,更新本地库，更新远端库
+mvn -Dmaven.test.skip=true clean package install 
+
 cd ${buildDir}/master/${moduleName}/target/${moduleName}/WEB-INF/lib
 oldLibs=(*)
 
@@ -113,31 +125,36 @@ oldLibs=(*)
 ###########################################
 cd ${WORKSPACE}
 compileFileList=$(git diff ${lastTag} HEAD --name-only | grep ${moduleName}** | grep **.java)
-staticFileList=$(git diff HEAD ${lastTag} --name-only --ignore-all-space | grep ${moduleName}/src/main/webapp/**.*)
+staticFileList=$(git diff ${lastTag} HEAD  --name-only --ignore-all-space | grep ${moduleName}/src/main/webapp/**.*)
 pomFileList=$(git diff ${lastTag} HEAD --name-only | grep **pom.xml)
 read -a array <<< ${compileFileList}
 read -a array_static <<< ${staticFileList}
 read -a array_pom <<< ${pomFileList}
 
 #将修改的.pom应用到master dir
-for i in ${!array_pom[@]};do
-	cp ${array_pom[$i]} ${buildDir}/master/${array_pom[$i]}
-done
+if [[ ${#array_pom[@]} != 0 ]];then
+	for i in ${!array_pom[@]};do
+		cp ${array_pom[$i]} ${buildDir}/master/${array_pom[$i]}
+	done
+fi
 
 cd ${moduleBase}
 resourceFileList=$(git diff ${lastTag} HEAD --name-only | grep ${moduleName}/src/main/resources/**.*)
 read -a array_resource <<< ${resourceFileList}
 
 #将修改的.java打包成patch.zip
-zip -q ${buildDir}/patch.zip ${compileFileList}
+if [[ $(echo ${compileFileList}) != "" ]];then
+	zip -q ${buildDir}/patch.zip ${compileFileList}
+fi
 
 ###########################################
 #升级包patch.zip覆盖至master dir并编译
 ###########################################
-cd ${buildDir}
-unzip -q -o patch.zip -d master
+if [ ! -f ${buildDir}"/patch.zip" ];then
+	unzip -q -o patch.zip -d master
+fi
 cd ${buildDir}/master/${moduleName}
-mvn clean compile -Dmaven.test.skip=true
+mvn -Dmaven.test.skip=true clean compile 
 
 ###########################################
 #提取master dir编译后的class文件到升级包
@@ -145,35 +162,43 @@ mvn clean compile -Dmaven.test.skip=true
 ###########################################
 javaSuffix=.java
 classSuffix=.class
-for i in ${!array[@]};do
-	mkdir -p $(dirname ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15})
-	cp ${buildDir}/master/${moduleName}/target/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix
-done
-for i in ${!array_static[@]};do
-	mkdir -p $(dirname ${buildDir}/${moduleName}/${array_static[$i]:${#moduleName}+17})
-	cp ${WORKSPACE}/${array_static[$i]} ${buildDir}/${moduleName}/${array_static[$i]:${#moduleName}+17}
-	cp ${WORKSPACE}/${array_static[$i]} ${buildDir}/master/${array_static[$i]}
-done
+if [[ ${#array[@]} != 0 ]];then
+	for i in ${!array[@]};do
+		mkdir -p $(dirname ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15})
+		cp ${buildDir}/master/${moduleName}/target/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix /
+		   ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix
+	done
+fi
+if [[ ${#array_static[@]} != 0 ]];then
+	for i in ${!array_static[@]};do
+		mkdir -p $(dirname ${buildDir}/${moduleName}/${array_static[$i]:${#moduleName}+17})
+		cp ${WORKSPACE}/${array_static[$i]} ${buildDir}/${moduleName}/${array_static[$i]:${#moduleName}+17}
+		cp ${WORKSPACE}/${array_static[$i]} ${buildDir}/master/${array_static[$i]}
+	done
+fi
 
 ###########################################
 #提取变更的classes dir下的资源文件 并覆盖至master dir代码
 ###########################################
-for i in ${!array_resource[@]};do
-	mkdir -p $(dirname ${buildDir}/${moduleName}/WEB-INF/classes/${array_resource[$i]:${#moduleName}+20})
-	cp ${WORKSPACE}/${array_resource[$i]} ${buildDir}/${moduleName}/WEB-INF/classes/${array_resource[$i]:${#moduleName}+20}
-	cp ${WORKSPACE}/${array_resource[$i]} ${buildDir}/master/${array_resource[$i]}
-done
+if [[ ${#array_static[@]} != 0 ]];then
+	for i in ${!array_resource[@]};do
+		mkdir -p $(dirname ${buildDir}/${moduleName}/WEB-INF/classes/${array_resource[$i]:${#moduleName}+20})
+		cp ${WORKSPACE}/${array_resource[$i]} ${buildDir}/${moduleName}/WEB-INF/classes/${array_resource[$i]:${#moduleName}+20}
+		cp ${WORKSPACE}/${array_resource[$i]} ${buildDir}/master/${array_resource[$i]}
+	done
+fi
 
 ###########################################
 #master重新编译并打war包
 #将当前分支的docker目录覆盖至master代码
 #构建镜像推送至215服务器
 ###########################################
-
 cd ${buildDir}/master/${moduleName}
-mvn package -Dmaven.test.skip=true
+mvn -Dmaven.test.skip=true package
 cp -r ${excuteDir} ${buildDir}/master/${moduleName}/src/main
-mvn docker:build -DpushImageTag 
+mvn -Dmaven.test.skip=true docker:build -DpushImageTag
+cd ${buildDir}/master/${moduleName}/target/docker/
+rm -rf $(find ./ -name "*.war")
 
 ###########################################
 #创建增量文件$moduleName.zip
@@ -181,9 +206,8 @@ mvn docker:build -DpushImageTag
 #master版本lib
 cd ${buildDir}/master/${moduleName}/target/${moduleName}/WEB-INF/lib
 libs=(*)
-#对比新增jar
-
 difLibs=()
+#对比新增jar
 for i in ${libs[@]}; do
 	skip=
 	for j in ${oldLibs[@]}; do
@@ -191,20 +215,27 @@ for i in ${libs[@]}; do
 	done
 	[[ -n $skip ]] || difLibs+=("$i")
 done
-mkdir ${buildDir}/${moduleName}/WEB-INF/lib
-rm -rf ${buildDir}/${moduleName}/WEB-INF/lib/*
-for i in ${difLibs[@]}; do
-	cp $i ${buildDir}/${moduleName}/WEB-INF/lib
-done
+
+mkdir -p ${buildDir}/${moduleName}/WEB-INF/lib
+
+if [[ ${#difLibs[@]} != 0 ]];then
+	rm -rf ${buildDir}/${moduleName}/WEB-INF/lib/*
+	for i in ${difLibs[@]}; do
+		cp $i ${buildDir}/${moduleName}/WEB-INF/lib
+	done
+fi
+
 mv ${WORKSPACE}/lib_explanation.sh ${buildDir}/${moduleName}/WEB-INF/lib/lib_explanation.sh
-#压缩增量dir
+
+###########################################
+#压缩增量包并上传（ftp，scp）到指定位置
+###########################################
 cd ${buildDir}
 zip -r -q ${moduleName}".zip" ${moduleName}/*
 
 ###########################################
 #增量文件上传ftp
 #本地的${buildDir}/ to ftp服务器上的/home/data
-###########################################
 #ftp -n<<!
 #open 192.168.1.215
 #user upload_admin 123456
@@ -216,8 +247,6 @@ zip -r -q ${moduleName}".zip" ${moduleName}/*
 #close
 #bye
 #!
+###########################################
 
-###########################################
-#ssh无密码传文件，日志显示进度
-###########################################
-scp -v ${buildDir}/${moduleName}".zip" root@192.168.1.215:/home/test-version/joinwe/${moduleName}".zip"
+scp ${buildDir}/${moduleName}".zip" root@192.168.1.215:/home/test-version/joinwe/${moduleName}".zip"

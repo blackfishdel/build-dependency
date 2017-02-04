@@ -1,0 +1,44 @@
+#!/bin/bash
+#chkconfig: 2345 80 90
+#description:auto_run
+
+###########################################
+#该文件需指定到/etc/rc.d/init.d文件夹下,默认开机启动
+#执行命令：
+#	chmod +x jenkins
+#	chkconfig --add jenkins
+###########################################
+
+start() {
+	nohup java -jar /usr/local/jenkins.war > /var/log/jenkins-$(date +%Y%m%d).log 2>&1 & echo $! > /var/run/jenkins.pid
+}
+
+stop() {
+	kill `cat /var/run/jenkins.pid`
+	rm /var/run/jenkins.pid
+}
+
+case "$1" in 
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart)
+		stop
+		start
+		;;
+	status)
+		if [ -e /var/run/jenkins.pid ]; then
+			echo jenkins is running, pid=`cat /var/run/jenkins.pid`
+		else
+			echo jenkins is not running
+			exit 1
+   fi
+		;;
+	*)
+		echo "Usage: $0 {start|stop|status|restart}"
+esac
+
+exit 0

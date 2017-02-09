@@ -10,12 +10,16 @@
 ###########################################
 
 start() {
-	nohup java -jar /usr/local/jenkins.war > /var/log/jenkins-$(date +%Y%m%d).log 2>&1 & echo $! > /var/run/jenkins.pid
+	echo "jenkins start..."
+	nohup java -jar /usr/local/jenkins.war > /var/log/jenkins.log 2>&1 & echo $! > /var/run/jenkins.pid
+	echo "jenkins start success!"
 }
 
 stop() {
+	echo "jenkins stop..."
 	kill `cat /var/run/jenkins.pid`
 	rm /var/run/jenkins.pid
+	echo "jenkins stop success"
 }
 
 case "$1" in 
@@ -35,7 +39,7 @@ case "$1" in
 		else
 			echo jenkins is not running
 			exit 1
-   fi
+		fi
 		;;
 	*)
 		echo "Usage: $0 {start|stop|status|restart}"

@@ -43,7 +43,7 @@ echo "cd \${BASEDIR}" >> ${WORKSPACE}/lib_explanation.sh
 echo "info: dependencys build!"
 
 mkdir -p ${WORKSPACE}/dependency
-BASEDIR=${WORKSPACE}/dependency
+dependency_dir=${WORKSPACE}/dependency
 
 if [ ${project_name} = ${module_name} ]
 then
@@ -70,15 +70,15 @@ then
 			git clone ${proPath}
 			if [[ ${proName} =~ "/" ]]
 			then
-				cd ${BASEDIR}/${proName%/*}
+				cd ${dependency_dir}/${proName%/*}
 			fi
 			#进入到子目录
 			git checkout ${proBranch}
 			git fetch
-			cd ${BASEDIR}/${proName}
+			cd ${dependency_dir}/${proName}
 			echo ${branchName}"  打包发布该分支"
 			#调用mvn构建项目,更新本地库，更新远端库
-			mvn -Dmaven.test.skip=true clean package install 
+			mvn -Dmaven.test.skip=true clean package -U install 
 			command_failed ${proName}" install failed!"
 			mvn -Dmaven.test.skip=true deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
 			command_failed ${proName}" deploy failed!"
@@ -87,7 +87,7 @@ then
 			echo "rm -f "${proName} >> ${WORKSPACE}/lib_explanation.sh
 		fi
 		#退出到主目录
-		cd ${BASEDIR}
+		cd ${dependency_dir}
 	done < ${BASEFILE}
 else
 	echo "info: the "${project_name}" is not find a dependency.txt!"
@@ -117,6 +117,8 @@ else
 	moduleBase=${WORKSPACE}/${moduleName}
 fi
 
+excuteDir=$(find ${moduleBase} -name '*docker' | grep 'src' | head -n 1)
+
 ###########################################
 #deploy到nexus使maven执行时能正确从nexus抓取依赖
 ###########################################
@@ -126,7 +128,7 @@ git fetch
 git checkout origin/${branch_name}
 git pull origin ${branch_name}
 
-mvn -Dmaven.test.skip=true clean package install 
+mvn -Dmaven.test.skip=true clean package -U install 
 command_failed ${project_name}" install failed!"
 
 mvn -Dmaven.test.skip=true deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/ 
@@ -160,7 +162,7 @@ then
 fi
 
 cd ${buildDir}/master/${moduleName}
-mvn -Dmaven.test.skip=true clean package install 
+mvn -Dmaven.test.skip=true package -U install
 command_failed "master/${moduleName}  install failed!"
 
 cd ${buildDir}/master/${moduleName}/target/${moduleName}/WEB-INF/lib
@@ -194,6 +196,7 @@ read -a array_resource <<< ${resourceFileList}
 #将修改的.java打包成patch.zip
 if [[ $(echo ${compileFileList}) != "" ]]
 then
+	cd ${WORKSPACE}
 	zip -q ${buildDir}/patch.zip ${compileFileList}
 fi
 
@@ -202,10 +205,12 @@ fi
 ###########################################
 if [ ! -f ${buildDir}"/patch.zip" ]
 then
+	cd ${buildDir}
 	unzip -q -o patch.zip -d master
+	rm -rf patch.zip
 fi
 cd ${buildDir}/master/${moduleName}
-mvn -Dmaven.test.skip=true clean compile 
+mvn -Dmaven.test.skip=true compile 
 command_failed "master/${moduleName} compile failed!"
 
 ###########################################
@@ -221,9 +226,9 @@ if [[ ${#array[@]} != 0 ]]
 then
 	for i in ${!array[@]};do
 		mkdir -p $(dirname ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15})
-		cp ${buildDir}/master/${moduleName}/target/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix /
-		   ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix
-	done
+		#cp ${buildDir}/master/${moduleName}/target/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix
+		cp ${buildDir}/master/${moduleName}/target/classes/${array[$i]:${#moduleName}+15:${#array[$i]}-(${#moduleName}+15)-${#javaSuffix}}${classSuffix} ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15:${#array[$i]}-(${#moduleName}+15)-${#javaSuffix}}${classSuffix}
+done
 fi
 
 if [[ ${#array_static[@]} != 0 ]]
@@ -251,14 +256,14 @@ fi
 ###########################################
 echo "info: again build master/${moduleName}!"
 cd ${buildDir}/master/${moduleName}
-mvn -Dmaven.test.skip=true package
+mvn -Dmaven.test.skip=true package -U
 command_failed "master/${moduleName} package failed!"
 cp -r ${excuteDir} ${buildDir}/master/${moduleName}/src/main
-mvn -Dmaven.test.skip=true docker:build -DpushImageTag
+mvn -Dmaven.test.skip=true docker:build -DpushImage
 command_failed "master/${moduleName} docker push failed!"
+
 cd ${buildDir}/master/${moduleName}/target/docker/
 rm -rf $(find ./ -name "*.war")
-
 ###########################################
 #创建增量文件$moduleName.zip
 ###########################################
@@ -266,6 +271,7 @@ echo "info: master/${moduleName}/**/lib/*.jar and ${moduleName}/**/lib/*.jar com
 cd ${buildDir}/master/${moduleName}/target/${moduleName}/WEB-INF/lib
 libs=(*)
 difLibs=()
+
 #对比新增jar
 for i in ${libs[@]}; do
 	skip=

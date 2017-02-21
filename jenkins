@@ -2,26 +2,27 @@
 #chkconfig: 2345 80 90
 #description:auto_run
 
-###########################################
+#------------------------------------------------------------------------------
 #该文件需指定到/etc/rc.d/init.d文件夹下,默认开机启动
 #执行命令：
-#	chmod +x jenkins
-#	chkconfig --add jenkins
-###########################################
+#chmod +x jenkins
+#chkconfig --add jenkins
+#------------------------------------------------------------------------------
 
 start() {
-	echo "jenkins start..."
-	nohup java -jar /usr/local/jenkins.war > /var/log/jenkins.log 2>&1 & echo $! > /var/run/jenkins.pid
-	echo "jenkins start success!"
+	echo 'jenkins start...'
+	/usr/local/apache-tomcat-jenkins/bin/startup.sh
+	#nohup java -server -Xmx3550m -Xms3550m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -jar /usr/local/jenkins.war > /var/log/jenkins.log 2>&1 & echo $! > /var/run/jenkins.pid
+	echo 'jenkins start success!'
 }
 
 stop() {
-	echo "jenkins stop..."
+	echo 'jenkins stop...'
 	kill `cat /var/run/jenkins.pid`
-	rm /var/run/jenkins.pid
-	echo "jenkins stop success"
+	/usr/local/apache-tomcat-jenkins/bin/shutdown.sh
+	echo 'jenkins stop success'
 }
-
+#------------------------------------------------------------------------------
 case "$1" in 
 	start)
 		start
@@ -32,14 +33,6 @@ case "$1" in
 	restart)
 		stop
 		start
-		;;
-	status)
-		if [ -e /var/run/jenkins.pid ]; then
-			echo jenkins is running, pid=`cat /var/run/jenkins.pid`
-		else
-			echo jenkins is not running
-			exit 1
-		fi
 		;;
 	*)
 		echo "Usage: $0 {start|stop|status|restart}"

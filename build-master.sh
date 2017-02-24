@@ -113,9 +113,9 @@ then
 			cd ${dependency_dir}/${pro_name}
 			echo "${branchName}  打包发布该分支"
 			#调用mvn构建项目,更新本地库，更新远端库
-			mvn -Dmaven.test.skip=true clean package -U install 
+			mvn -q -Dmaven.test.skip=true clean package -U install 
 			command_failed "${pro_name} install failed!"
-			mvn -Dmaven.test.skip=true deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
+			mvn -q -Dmaven.test.skip=true deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
 			command_failed "${pro_name} deploy failed!"
 		elif [[ ${pro_name} != "/" && ${pro_name} != "" && ${pro_type} = "delete" ]]
 		then
@@ -136,7 +136,7 @@ git stash
 git fetch
 git checkout origin/${branch_name}
 git pull origin ${branch_name}
-mvn -Dmaven.test.skip=true clean package -U install deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/ 
+mvn -q -Dmaven.test.skip=true clean package -U install deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/ 
 command_failed ${project_name}" deploy failed!"
 rm -rf $(find ${WORKSPACE} -name "*.war")
 rm -rf $(find ${WORKSPACE} -name "*.jar")
@@ -154,7 +154,7 @@ rm -rf ${master_zip_path}
 #------------------------------------------------------------------------------
 #对master打包
 cd ${master_dir}/${module_name}
-mvn -Dmaven.test.skip=true package -U install
+mvn -q -Dmaven.test.skip=true package -U install
 command_failed "${master_dir}/${module_name}  install failed!"
 cd ${master_dir}/${module_name}/target/${module_name}/WEB-INF/lib
 oldLibs=(*)
@@ -199,7 +199,7 @@ else
 fi
 
 cd "${master_dir}/${module_name}"
-mvn -Dmaven.test.skip=true clean package
+mvn -q -Dmaven.test.skip=true clean package
 command_failed "${master_dir}/${module_name} compile failed!"
 cd "${master_dir}/${module_name}/target/${module_name}/WEB-INF/lib"
 nowLibs=(*)
@@ -208,7 +208,7 @@ nowLibs=(*)
 #------------------------------------------------------------------------------
 #web_path构建docker并push,并删除war
 cd "${master_dir}/${module_name}"
-mvn -Dmaven.test.skip=true docker:build -DpushImage
+mvn -q -Dmaven.test.skip=true docker:build -DpushImage
 command_failed "${master_dir}/${module_name} docker push failed!"
 rm -rf $(find "${master_dir}" -name '*.war' | grep 'docker')
 #------------------------------------------------------------------------------

@@ -67,7 +67,9 @@ then
 		if [[ ${proType} == "deploy" ]]
 		then
 			#git下载代码并更新
-			git clone ${proPath}
+			if [ ${proPath} ];then
+				git clone ${proPath}
+			fi
 			if [[ ${proName} =~ "/" ]]
 			then
 				cd ${dependency_dir}/${proName%/*}

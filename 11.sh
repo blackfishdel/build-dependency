@@ -200,4 +200,35 @@ diff -r /root/.jenkins/workspace/TEST-JAVA/zkp-dbms-web/ /root/.jenkins/workspac
 
 
 
-git diff --name-only --name-status origin/1.0.0-release HEAD
+git diff --name-status origin/1.0.0-release HEAD | grep '^M' | awk '{print $2}' | grep -v '^\.'  | grep -v '.java'
+
+git diff --name-status d725b5dc9e78a2a4efd5fe8fabf1ab15100ea1be a66f117b5bd729f19f2334d6ab65378293a219ef | grep -v '^.' | grep '^D' | awk '{print $2}'
+
+git diff --name-status d725b5dc9e78a2a4efd5fe8fabf1ab15100ea1be a66f117b5bd729f19f2334d6ab65378293a219ef | grep -v '^.' | grep '^D' | awk '{print $2}'
+
+
+git diff --name-status d725b5dc9e78a2a4efd5fe8fabf1ab15100ea1be b7d17c128b5fc746a07fd6205e79c5ed440305f7
+
+
+curl -o 1.0.0-release.zip "http://192.168.1.215:9090/zip/?r=joinwe/zkp-dbms.git&h=1.0.0-release&format=zip"
+curl -o 1.0.2-release.zip "http://192.168.1.215:9090/zip/?r=joinwe/zkp-dbms.git&h=1.0.2-release&format=zip"
+
+diff -ruNaq ./test/a ./test/b > patch.log
+
+diff -ruaq /root/test/b/zkp-dbms-web/target/classes /root/test/a/zkp-dbms-web/target/classes > patch.log
+
+
+diff -ruNaq /root/test/b/ /root/test/a --exclude=/tartget | grep '^Files'
+
+
+diff -ruaq /root/test/b/ /root/test/a | grep '^Only in'
+
+diff -ruaq /root/test/b/zkp-dbms-web/target/zkp-dbms-web/WEB-INF/lib /root/test/a/zkp-dbms-web/target/dbms-web/WEB-INF/lib > patch.log
+
+
+
+
+
+
+
+

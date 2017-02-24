@@ -120,6 +120,11 @@ diff_file_list=($(diff -ruaq "${BASE_DIR}" "${master_dir}" \
 add_file_list=($(diff -ruaq "${BASE_DIR}" "${master_dir}" \
 	| grep '^Only' | grep "${BASE_DIR}" | grep -v '\.git' \
 	| awk '{print $3,$4;}' | sed 's/: /\//' ))
+	
+#屏蔽master的文件列，默认为master需要文件
+remove_file_list=($(diff -ruaq "${BASE_DIR}" "${master_dir}" \
+	| grep '^Only' | grep "${master_dir}" | grep -v '\.git' \
+	| awk '{print $3,$4;}' | sed 's/: /\//' ))
 
 #把branch的add\diff文件复制到master
 if [[ ${#diff_file_list[@]} != 0 ]];then
@@ -141,6 +146,15 @@ if [ -d ${add_file_list[$i]} ];then
 continue
 fi
 cp "${add_file_list[$i]}" "${dir_path}"
+done
+fi
+
+if [[ ${#remove_file_list[@]} != 0 ]];then
+for i in ${!remove_file_list[@]};do
+if [[ -d "${remove_file_list[$i]}" ]];then
+continue
+fi
+rm -f "${remove_file_list[$i]}"
 done
 fi
 #master_dir进行打包
@@ -184,7 +198,7 @@ patch_add_file_list=($(diff -ruaq "${master_dir}/${module_name}/target/${module_
 #把master的add\diff文件复制到patch
 if [[ ${#patch_diff_file_list[@]} != 0 ]];then
 for i in ${!patch_diff_file_list[@]};do
-dir_path="${patch_diff_file_list[$i]/"${master_dir}/${module_name}/target/"/${patch_dir}}"
+dir_path="${patch_diff_file_list[$i]/"${master_dir}/${module_name}/target"/${patch_dir}}"
 mkdir -p $(dirname "${dir_path}")
 if [ -d ${patch_diff_file_list[$i]} ];then
 continue
@@ -195,7 +209,7 @@ fi
 
 if [[ ${#patch_add_file_list[@]} != 0 ]];then
 for i in ${!patch_add_file_list[@]};do
-dir_path="${patch_add_file_list[$i]/"${master_dir}/${module_name}/target/"/${patch_dir}}"
+dir_path="${patch_add_file_list[$i]/"${master_dir}/${module_name}/target"/${patch_dir}}"
 mkdir -p $(dirname "${dir_path}")
 if [ -d ${patch_add_file_list[$i]} ];then
 continue
@@ -205,19 +219,22 @@ done
 fi
 #对比master编译后有，last编译后master没有的文件
 #屏蔽没有后缀的列，认为没有“.”的列为文件夹
-remove_file_list=($(diff -ruaq "${master_dir}/${module_name}/target/${module_name}" \
+patch_remove_file_list=($(diff -ruaq "${master_dir}/${module_name}/target/${module_name}" \
 								"${last_web_dir}/target/${module_name}" \
-								| grep '^Only' | grep "${last_dir}" \
+								| grep '^Only' | grep "${last_web_dir}" \
 								| awk  '{print $3,$4;}' | sed 's/: /\//'  \
 								| sed "s;"${last_web_dir}/target/${module_name}/";;"))
-for i in ${remove_file_list[@]};do
-if [[ ! ${last_web_dir} =~ '\.jar' || -d "${last_web_dir}/target/${module_name}/${remove_file_list[$i]}" ]];then
+
+if [[ ${#patch_remove_file_list[@]} != 0 ]];then
+for i in ${!patch_remove_file_list[@]};do
+if [[ -d "${last_web_dir}/target/${module_name}/${patch_remove_file_list[$i]}" ]];then
 continue
 fi
-echo "rm -f ${remove_file_list[i]}" >> "${WORKSPACE}/explanation.sh"
+echo "rm -f ${patch_remove_file_list[i]}" >> "${WORKSPACE}/explanation.sh"
 done
+fi
 
-echo "rm -f ${BASEDIR}/explanation.sh" >> "${WORKSPACE}/explanation.sh"
+echo "rm -f \${BASEDIR}/explanation.sh" >> "${WORKSPACE}/explanation.sh"
 mv "${WORKSPACE}/explanation.sh" "${patch_dir}/${module_name}"
 
 cd "${patch_dir}"

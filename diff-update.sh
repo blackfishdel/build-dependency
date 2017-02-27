@@ -32,6 +32,9 @@ mkdir -p ${last_dir}
 patch_dir="${WORKSPACE}/patch"
 patch_name="${module_name}.zip"
 mkdir -p ${patch_dir}
+
+maven_local_dir="${WORKSPACE}/maven_reprository"
+mkdir -p ${maven_local_dir}
 #------------------------------------------------------------------------------
 #step 1
 #------------------------------------------------------------------------------
@@ -80,7 +83,7 @@ git fetch
 cd ${dependency_dir}/${pro_name}
 echo "info:${pro_name} ${pro_branch} 打包发布该分支!"
 #调用mvn构建项目,更新本地库，更新远端库
-mvn -q -Dmaven.test.skip=true clean package -U install deploy \
+mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true -Dmaven.repo.local=${maven_local_dir} \
 -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ \
 -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
 fi
@@ -159,7 +162,7 @@ done
 fi
 #master_dir进行打包
 cd "${master_dir}"
-mvn -q -Dmaven.test.skip=true clean package -U install deploy \
+mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true -Dmaven.repo.local=${maven_local_dir} \
 -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ \
 -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
 #master_dir进行docker image构建并上传
@@ -168,7 +171,7 @@ cd "${master_dir}"
 else
 cd "${master_dir}/${module_name}"
 fi
-mvn -q -Dmaven.test.skip=true docker:build -DpushImage
+mvn docker:build -q -e -Dmaven.test.skip=true -DpushImage 
 #------------------------------------------------------------------------------
 #下载last.zip并解压到last_dir,当前未编译
 curl -o "${last_tag_zip_path}" "${last_tag_zip_url}"
@@ -182,7 +185,7 @@ else
 cd "${last_dir}/${module_name}"
 last_web_dir="${last_dir}/${module_name}"
 fi
-mvn -q -Dmaven.test.skip=true clean package
+mvn clean package -q -Dmaven.test.skip=true
 
 #对比master与last编译后修改文件
 patch_diff_file_list=($(diff -ruaq "${master_dir}/${module_name}/target/${module_name}" \
@@ -251,7 +254,7 @@ rm -rf $(find ${master_dir} -name '*\.war')
 #------------------------------------------------------------------------------
 #master_dir进行打包
 cd "${BASE_DIR}"
-mvn -q -Dmaven.test.skip=true clean package -U install deploy \
+mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true -Dmaven.repo.local=${maven_local_dir} \
 -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ \
 -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
 #master_dir进行docker image构建并上传
@@ -260,7 +263,7 @@ cd "${BASE_DIR}"
 else
 cd "${BASE_DIR}/${module_name}"
 fi
-mvn -q -Dmaven.test.skip=true docker:build -DpushImage
+mvn docker:build -q -Dmaven.test.skip=true -DpushImage
 rm -rf $(find ./ -name '*\.war'| head -n 1) 
 war_path=$(find ./ -name '*\.war'| head -n 1) 
 scp "${war_path}" "root@192.168.1.215:/home/test-version/joinwe/${war_path##*/}"

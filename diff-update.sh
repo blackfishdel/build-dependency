@@ -76,6 +76,8 @@ if [ ${pro_type} = "deploy" ];then
 git clone ${pro_path}
 if [[ ${pro_name} =~ "/" ]];then
 cd ${dependency_dir}/${pro_name%/*}
+else
+cd ${dependency_dir}/${pro_name}
 fi
 git checkout ${pro_branch}
 git fetch
@@ -83,7 +85,7 @@ git fetch
 cd ${dependency_dir}/${pro_name}
 echo "info:${pro_name} ${pro_branch} 打包发布该分支!"
 #调用mvn构建项目,更新本地库，更新远端库
-mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true -Dmaven.repo.local=${maven_local_dir} \
+mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true  -Dmaven.repo.local=${WORKSPACE}/maven_reprository \
 -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ \
 -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
 fi
@@ -162,7 +164,7 @@ done
 fi
 #master_dir进行打包
 cd "${master_dir}"
-mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true -Dmaven.repo.local=${maven_local_dir} \
+mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true  -Dmaven.repo.local=${WORKSPACE}/maven_reprository \
 -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ \
 -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
 #master_dir进行docker image构建并上传
@@ -254,7 +256,7 @@ rm -rf $(find ${master_dir} -name '*\.war')
 #------------------------------------------------------------------------------
 #master_dir进行打包
 cd "${BASE_DIR}"
-mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true -Dmaven.repo.local=${maven_local_dir} \
+mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true -Dmaven.repo.local=${WORKSPACE}/maven_reprository \
 -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ \
 -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
 #master_dir进行docker image构建并上传

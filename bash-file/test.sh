@@ -1,12 +1,11 @@
 #!/bin/bash -e
+json_description=$(cat "/home/delxie/Documents/git-repository/bssp/description.json")
 
-json_file_path="/home/delxie/Documents/git-repository/build-dependency/bash-file/description.json"
-
-jq_names=$(cat ${json_file_path} | jq '.modules | .[] | .name' | sed {s/\"//g})
-jq_values=$(cat ${json_file_path} | jq '.modules | .[] | .value' | sed {s/\"//g})
-echo ${jq_names[@]}
-#cat ${json_file_path} | jq '.dependencies | recurse(.modules[])'
-#echo ${#list[@]}
-#echo ${list[2]} | jq 'fromjson | .modules'
-
-#cat ${json_file_path} | jq -r 'recurse(.dependencies[]) | tostring'
+#循环遍历
+jq_dependencies=($(echo ${json_description} | jq "recurse(.dependencies[]) | .dependencies | tostring"))
+for ((i=${#jq_dependencies[@]};i>0;i--));do
+	jq_i=`expr i-1`
+	jq_dependency=$(echo ${jq_dependencies[${jq_i}]} | jq "fromjson")
+	jq_dependency_length=$(echo ${jq_dependency} | jq ".[] | length")
+	echo ${jq_dependency}
+done

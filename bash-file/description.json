@@ -1,6 +1,6 @@
 {
 	"project_name":"bssp",
-	"web_mdoule":"",
+	"web_mdoule":"bssp-service",
 	"now_branch":"",
 	"now_tag":"",
 	"last_tag":"",

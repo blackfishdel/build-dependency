@@ -32,21 +32,21 @@ case ${1} in
 ;;
 "sit")
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion=${project.version}
+-DremoveSnapshot=true -DnewVersion='${project.version}'
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion=${project.version}"-ALPHA"
+-DremoveSnapshot=true -DnewVersion='${project.version}-ALPHA'
 ;;
 "uet")
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion=${project.version}
+-DremoveSnapshot=true -DnewVersion='${project.version}'
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion=${project.version}"-BETA"
+-DremoveSnapshot=true -DnewVersion='${project.version}-BETA'
 ;;
 "pro")
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion=${project.version}
+-DremoveSnapshot=true -DnewVersion='${project.version}'
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion=${project.version}"-RELEASE"
+-DremoveSnapshot=true -DnewVersion='${project.version}-RELEASE'
 ;;
 esac
 }
@@ -67,15 +67,15 @@ case ${1} in
 echo "info:dev is not change!"
 ;;
 "sit")
-versions:update-property -q -B -e -U -Dmaven.test.skip=true \
+mvn versions:update-property -q -B -e -U -Dmaven.test.skip=true \
 -Dproperty="${3}.version" -DnewVersion="${4}-ALPHA"
 ;;
 "uet")
-versions:update-property -q -B -e -U -Dmaven.test.skip=true \
+mvn versions:update-property -q -B -e -U -Dmaven.test.skip=true \
 -Dproperty="${3}.version" -DnewVersion="${4}-BETA"
 ;;
 "pro")
-versions:update-property -q -B -e -U -Dmaven.test.skip=true \
+mvn versions:update-property -q -B -e -U -Dmaven.test.skip=true \
 -Dproperty="${3}.version" -DnewVersion="${4}-RELEASE"
 ;;
 esac
@@ -575,8 +575,8 @@ case ${project_tag} in
 	#压缩增量包并上传（scp）到指定服务器备份
 	fun_backup_file "${WORKSPACE}/${web_mdoule}.zip"
 	#删除编译后文件
-	rm -rf $(find ${master_dir} -name '*\.jar')
-	rm -rf $(find ${master_dir} -name '*\.war')
+	rm -rf $(find ${WORKSPACE} -name '*\.jar')
+	rm -rf $(find ${WORKSPACE} -name '*\.war')
 	;;
 	'full')
 	#------------------------------------------------------------------------------
@@ -632,8 +632,8 @@ case ${project_tag} in
 	fi
 	fun_push_image ${base_web}
 	#删除编译后文件
-	rm -rf $(find ./ -name '*\.war'| head -n 1)
-	war_path=$(find ./ -name '*\.war'| head -n 1)
+	rm -rf $(find ./ -name '*\.war'| grep "docker")
+	war_path=$(find ./ -name '*\.war'| grep "docker" | head -n 1)
 	#压缩增量包并上传（scp）到指定服务器备份
 	fun_backup_file "${war_path}"
 	;;

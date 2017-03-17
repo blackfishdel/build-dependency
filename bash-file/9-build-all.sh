@@ -32,21 +32,27 @@ case ${1} in
 ;;
 "sit")
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}'
+-DremoveSnapshot=true -DnewVersion='${project.version}' \
+-DupdateMatchingVersions=false
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}-ALPHA'
+-DremoveSnapshot=true -DnewVersion='${project.version}-ALPHA' \
+-DupdateMatchingVersions=false
 ;;
-"uet")
+"uat")
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}'
+-DremoveSnapshot=true -DnewVersion='${project.version}' \
+-DupdateMatchingVersions=false
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}-BETA'
+-DremoveSnapshot=true -DnewVersion='${project.version}-BETA' \
+-DupdateMatchingVersions=false
 ;;
 "pro")
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}'
+-DremoveSnapshot=true -DnewVersion='${project.version}' \
+-DupdateMatchingVersions=false
 mvn versions:set -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}-RELEASE'
+-DremoveSnapshot=true -DnewVersion='${project.version}-RELEASE' \
+-DupdateMatchingVersions=false
 ;;
 esac
 }
@@ -68,15 +74,15 @@ echo "info:dev is not change!"
 ;;
 "sit")
 mvn versions:update-property -q -B -e -U -Dmaven.test.skip=true \
--Dproperty="${3}.version" -DnewVersion="${4}-ALPHA"
+-DallowSnapshots=true -Dproperty="${3}.version" -DnewVersion="[${4}-ALPHA]"
 ;;
-"uet")
+"uat")
 mvn versions:update-property -q -B -e -U -Dmaven.test.skip=true \
--Dproperty="${3}.version" -DnewVersion="${4}-BETA"
+-DallowSnapshots=true -Dproperty="${3}.version" -DnewVersion="[${4}-BETA]"
 ;;
 "pro")
 mvn versions:update-property -q -B -e -U -Dmaven.test.skip=true \
--Dproperty="${3}.version" -DnewVersion="${4}-RELEASE"
+-DallowSnapshots=true -Dproperty="${3}.version" -DnewVersion="[${4}-RELEASE]"
 ;;
 esac
 }
@@ -100,7 +106,7 @@ mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
 -Dmaven.repo.local="${maven_repository}" \
 -DaltReleaseDeploymentRepository="nexus-snapshots::default::${alpha_url}"
 ;;
-"uet")
+"uat")
 mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
 -Dmaven.repo.local="${maven_repository}" \
 -DaltReleaseDeploymentRepository="nexus-snapshots::default::${beta_url}"
@@ -208,9 +214,9 @@ maven_repository="${WORKSPACE}/maven_repository"
 mkdir -p ${maven_repository}
 
 #------------------------------------------------------------------------------
-#read description.json
+#read build.json
 #------------------------------------------------------------------------------
-description_path="$(find ${base_dir} -name description.json | head -n 1)"
+description_path="$(find ${base_dir} -name build.json | head -n 1)"
 if [ ${description_path} ];then
 	description_find='find'
 else
@@ -219,7 +225,7 @@ fi
 
 case ${description_find} in
 'not find')
-echo "info:description.json is did not find!"
+echo "info:build.json is did not find!"
 ;;
 'find')
 json_description=$(cat ${description_path})
@@ -290,6 +296,8 @@ case ${dependencies_build} in
 				fi
 				#修改父pom文件版本号
 				fun_version_change "${build_context}" "${dependency_dir}/${jq_project}"
+				#编译父项目
+				fun_deploy_nexus "${build_context}" "${dependency_dir}/${jq_project}"
 				if [[ $(echo ${jq_dependency} | jq ".[${j}] | .modules") && \
 					$(echo ${jq_dependency} | jq ".[${j}] | .modules") != "null" ]];then
 					#修改子项目pom文件版本号
@@ -300,8 +308,7 @@ case ${dependencies_build} in
 					if [ ${#jq_sub_names[@]} != 0 ];then
 						for ((k=0;k<${#jq_sub_names[@]};k++));do
 							fun_version_change "${build_context}" \
-							"${dependency_dir}/${jq_project}/${jq_sub_names[${k}]}" \
-							"${jq_sub_names[${k}]}" "${jq_sub_values[${k}]}"
+							"${dependency_dir}/${jq_project}/${jq_sub_names[${k}]}"
 						done
 					fi
 					#编译子项目
@@ -325,6 +332,7 @@ case ${dependencies_build} in
 				#编译父项目
 				#发布项目到nexus仓库
 				fun_deploy_nexus "${build_context}" "${dependency_dir}/${jq_project}"
+				rm -rf "${dependency_dir}/${jq_project}"
 			done
 		fi
 	done
@@ -455,14 +463,14 @@ case ${project_tag} in
 	fi
 	#修改父pom文件版本号
 	fun_version_change "${build_context}" "${master_dir}"
-	
+	#编译父项目
+	fun_deploy_nexus "${build_context}" "${master_dir}"
 	#修改子项目pom文件版本号
 	jq_sub_names=($(echo ${json_description} | jq '.modules | .[] | .name' | sed {s/\"//g}))
 	jq_sub_values=($(echo ${json_description} | jq '.modules | .[] | .version' | sed {s/\"//g}))
 	if [ ${#jq_sub_names[@]} != 0 ];then
 		for ((i=0;i<${#jq_sub_names[@]};i++));do
-			fun_version_change "${build_context}" "${master_dir}" \
-			"${jq_sub_names[$i]}" "${jq_sub_values[$i]}"
+			fun_version_change "${build_context}" "${master_dir}/${jq_sub_names[$i]}" 
 		done
 	fi
 	
@@ -552,9 +560,9 @@ case ${project_tag} in
 	fi
 	#对比master_dir编译后有，last_dir编译后master_dir没有的文件
 	#屏蔽没有后缀的列，认为没有“.”的列为文件夹
-	patch_remove_file_list=($(diff -ruaq "${master_dir}/${web_mdoule}/target/${web_mdoule}" \
+	patch_remove_file_list=($(diff -ruaq "${master_web}/target/${web_mdoule}" \
 									"${last_web}/target/${web_mdoule}" \
-									| grep '^Only' | grep "${last_web_dir}" \
+									| grep '^Only' | grep "${last_web}" \
 									| awk  '{print $3,$4;}' | sed 's/: /\//'  \
 									| sed "s;"${last_web}/target/${web_mdoule}/";;"))
 	
@@ -567,11 +575,11 @@ case ${project_tag} in
 		done
 	fi
 	
-	mv "${WORKSPACE}/remove_file.sh" "${last_web}"
+	mv "${WORKSPACE}/remove_file.sh" "${patch_dir}/${web_mdoule}"
 	
 	#压缩patch_dir
-	cd "${WORKSPACE}"
-	zip -r "${web_mdoule}.zip" "${last_web}"
+	cd "${patch_dir}"
+	zip -r "${WORKSPACE}/${web_mdoule}.zip" ./
 	#压缩增量包并上传（scp）到指定服务器备份
 	fun_backup_file "${WORKSPACE}/${web_mdoule}.zip"
 	#删除编译后文件
@@ -594,14 +602,14 @@ case ${project_tag} in
 	fi
 	#修改父pom文件版本号
 	fun_version_change "${build_context}" "${base_dir}"
-	
+	#编译父项目
+	fun_deploy_nexus "${build_context}" "${base_dir}"
 	#修改子项目pom文件版本号
 	jq_sub_names=($(echo ${json_description} | jq '.modules | .[] | .name' | sed {s/\"//g}))
 	jq_sub_values=($(echo ${json_description} | jq '.modules | .[] | .version' | sed {s/\"//g}))
 	if [ ${#jq_sub_names[@]} != 0 ];then
 		for ((i=0;i<${#jq_sub_names[@]};i++));do
-			fun_version_change "${build_context}" "${base_dir}" \
-			"${jq_sub_names[$i]}" "${jq_sub_values[$i]}"
+			fun_version_change "${build_context}" "${base_dir}/${jq_sub_names[$i]}"
 		done
 	fi
 	

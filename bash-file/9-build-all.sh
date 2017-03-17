@@ -498,6 +498,7 @@ case ${project_tag} in
 	else
 		master_web="${master_dir}/${web_mdoule}"
 	fi
+	fun_package_pro ${master_web}
 	fun_push_image ${master_web}
 	
 	#------------------------------------------------------------------------------
@@ -638,6 +639,7 @@ case ${project_tag} in
 	else
 		base_web="${base_dir}/${web_mdoule}"
 	fi
+	fun_package_pro ${base_web}
 	fun_push_image ${base_web}
 	#删除编译后文件
 	rm -rf $(find ./ -name '*\.war'| grep "docker")

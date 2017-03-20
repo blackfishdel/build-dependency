@@ -355,10 +355,6 @@ project_name=$(echo ${json_description} | \
 	jq '.project_name' | sed {s/\"//g})
 web_mdoule=$(echo ${json_description} | \
 	jq '.web_mdoule' | sed {s/\"//g})
-now_branch=$(echo ${json_description} | \
-	jq '.now_branch' | sed {s/\"//g})
-now_tag=$(echo ${json_description} | \
-	jq '.now_tag' | sed {s/\"//g})
 last_tag=$(echo ${json_description} | \
 	jq '.last_tag' | sed {s/\"//g})
 

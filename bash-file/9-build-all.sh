@@ -386,9 +386,8 @@ elif [ ${now_tag} ];then
 		project_tag="full"
 	fi
 	cd ${base_dir}
-	git branch -b "${now_tag}" "${now_tag}"
-	git fetch
-	git checkout "${now_branch}"
+	git checkout -b "${now_tag}" "${now_tag}"
+	git pull
 fi
 
 #------------------------------------------------------------------------------
@@ -455,12 +454,14 @@ case ${project_tag} in
 	| jq '.dependencies | .[] | .modules | .[] | .name' | sed {s/\"//g}))
 	jq_dep_values=($(echo ${json_description} \
 	| jq '.dependencies | .[] | .modules | .[] | .version' | sed {s/\"//g}))
-	if [ ${#jq_dep_names[@]} != 0 ];then
+
+		if [ ${#jq_dep_names[@]} != 0 ];then
 		for ((i=0;i<${#jq_dep_names[@]};i++));do
 			fun_dependency_change "${build_context}" "${master_dir}" \
 			"${jq_dep_names[$i]}" "${jq_dep_values[$i]}"
 		done
 	fi
+
 	#修改父pom文件版本号
 	fun_version_change "${build_context}" "${master_dir}"
 	#编译父项目

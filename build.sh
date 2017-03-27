@@ -1,325 +1,277 @@
-#!/bin/bash
-set -x
-###########################################
-#command_failed:判断命令是否正常执行，如果错误并输出错误信息并退出脚本
-###########################################
-command_failed(){
-	if [ $? -ne 0 ]
-	then
-		echo "error: $*"
-		exit 1
-	fi
-}
+#!/bin/bash -ex
 
-###########################################
-#创建自删除文件lib_explanation.sh
-###########################################
-echo "info: lib_explanation.sh build!"
+#remote paramter:
+#project_name
+#module_name
+#branch_name
+#last_tag
+#------------------------------------------------------------------------------
+#init
+#------------------------------------------------------------------------------
+cd ${WORKSPACE}
+#移动文件到project_name文件夹下
+BASE_DIR="${WORKSPACE}/${project_name}"
+mkdir -p "${WORKSPACE}/${project_name}"
+mv $(ls -a | grep -v "^${project_name}$" | grep -v "\.$" | grep -v "\.\.$") "${WORKSPACE}/${project_name}"
 
-echo "#!/bin/bash" > ${WORKSPACE}/lib_explanation.sh
-echo "###########################################" >> ${WORKSPACE}/lib_explanation.sh
-echo "#BASEDIR" >> ${WORKSPACE}/lib_explanation.sh
-echo "#解决获得脚本存储位置绝对路径" >> ${WORKSPACE}/lib_explanation.sh
-echo "#这个方法可以完美解决别名、链接、source、bash -c 等导致的问题" >> ${WORKSPACE}/lib_explanation.sh
-echo "###########################################" >> ${WORKSPACE}/lib_explanation.sh
-echo "SOURCE=\${BASH_SOURCE[0]}" >> ${WORKSPACE}/lib_explanation.sh
-echo "while [ -h \${SOURCE} ]; do" >> ${WORKSPACE}/lib_explanation.sh
-echo "  DIR=\$( cd -P \$( dirname \${SOURCE} ) \&\& pwd \)" >> ${WORKSPACE}/lib_explanation.sh
-echo "  SOURCE=\$(readlink \${SOURCE})" >> ${WORKSPACE}/lib_explanation.sh
-echo "  [[ \${SOURCE} != /* ]] && SOURCE=\${DIR}/\${SOURCE}" >> ${WORKSPACE}/lib_explanation.sh
-echo "done" >> ${WORKSPACE}/lib_explanation.sh
-echo "#获取到该文件当前目录" >> ${WORKSPACE}/lib_explanation.sh
-echo "BASEDIR=\$( cd -P \$( dirname \${SOURCE} ) && pwd )" >> ${WORKSPACE}/lib_explanation.sh
-echo "#进入到该文件当前目录,删除目录下文件" >> ${WORKSPACE}/lib_explanation.sh
-echo "cd \${BASEDIR}" >> ${WORKSPACE}/lib_explanation.sh
-
-###########################################
-#打印执行命令
-#指定dependency文件夹
-#找到目标项目dependency.txt while读取
-#dependency.txt文件不能少于2行,最后一行不执行
-#在lib_explanation.sh中写入删除的jar
-###########################################
-echo "info: dependencys build!"
-
+dependency_dir="${WORKSPACE}/dependency"
 mkdir -p ${WORKSPACE}/dependency
-dependency_dir=${WORKSPACE}/dependency
 
-if [ ${project_name} = ${module_name} ]
-then
-		BASEFILE=$(find ${WORKSPACE} -name dependency.txt | head -n 1)
-	else
-		BASEFILE=$(find ${WORKSPACE}/${module_name} -name dependency.txt | head -n 1)
+master_zip_url="http://192.168.1.215:9090/zip/?r=joinwe/${project_name}.git&h=master&format=zip"
+master_zip_path="${WORKSPACE}/master.zip"
+
+master_dir="${WORKSPACE}/master"
+mkdir -p ${master_dir}
+
+last_tag_zip_url="http://192.168.1.215:9090/zip/?r=joinwe/${project_name}.git&h=${last_tag}&format=zip"
+last_tag_zip_path="${WORKSPACE}/last.zip"
+
+last_dir="${WORKSPACE}/last"
+mkdir -p ${last_dir}
+
+patch_dir="${WORKSPACE}/patch"
+patch_name="${module_name}.zip"
+mkdir -p ${patch_dir}
+
+maven_local_dir="${WORKSPACE}/maven_reprository"
+mkdir -p ${maven_local_dir}
+#------------------------------------------------------------------------------
+#step 1
+#------------------------------------------------------------------------------
+#创建explanation.sh文件
+touch ${WORKSPACE}/explanation.sh
+cat << "EOF" > "${WORKSPACE}/explanation.sh"
+#!/bin/bash
+#BASEDIR解决获得脚本存储位置绝对路径,这个方法可以完美解决别名、链接、source、bash -c 等导致的问题
+SOURCE="${BASH_SOURCE[0]}"
+
+while [ -h ${SOURCE} ];do
+DIR=$( cd -P $( dirname ${SOURCE} ) && pwd )
+SOURCE="$(readlink ${SOURCE})"
+[[ ${SOURCE} != /* ]] && SOURCE=${DIR}/${SOURCE}
+done
+
+BASEDIR="$( cd -P $( dirname ${SOURCE} ) && pwd )"
+cd ${BASEDIR}
+EOF
+#------------------------------------------------------------------------------
+#step 2
+#------------------------------------------------------------------------------
+#解析dependency.txt文件
+dependency_path="$(find ${BASE_DIR} -name dependency.txt | head -n 1)"
+
+if [ ${dependency_path} ];then
+#进入到dependency_dir
+cd ${dependency_dir}
+while read pathLine;do
+if [[ ${pathLine} == "end" || ${pathLine} =~ "#" ]];then
+continue
 fi
-
-if [ ${BASEFILE} ]
-then
-	while read pathLine
-	do
-		if [[ ${pathLine} == "end" || ${pathLine} =~ "#" ]]
-		then
-			continue
-		fi
-		proName=`echo ${pathLine} | cut -d \; -f 1`
-		proBranch=`echo ${pathLine} | cut -d \; -f 2`
-		proPath=`echo ${pathLine} | cut -d \; -f 3`
-		proType=`echo ${pathLine} | cut -d \; -f 4`
-		if [[ ${proType} == "deploy" ]]
-		then
-			#git下载代码并更新
-			if [ ${proPath} ];then
-				git clone ${proPath}
-			fi
-			if [[ ${proName} =~ "/" ]]
-			then
-				cd ${dependency_dir}/${proName%/*}
-			fi
-			#进入到子目录
-			git checkout ${proBranch}
-			git fetch
-			cd ${dependency_dir}/${proName}
-			echo ${branchName}"  打包发布该分支"
-			#调用mvn构建项目,更新本地库，更新远端库
-			mvn -Dmaven.test.skip=true clean package -U install 
-			command_failed ${proName}" install failed!"
-			mvn -Dmaven.test.skip=true deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
-			command_failed ${proName}" deploy failed!"
-		elif [[ ${proName} != "/" && ${proName} != "" && ${proType} == "delete" ]]
-		then
-			echo "rm -f "${proName} >> ${WORKSPACE}/lib_explanation.sh
-		fi
-		#退出到主目录
-		cd ${dependency_dir}
-	done < ${BASEFILE}
+pro_name=`echo ${pathLine} | cut -d \; -f 1`
+pro_branch=`echo ${pathLine} | cut -d \; -f 2`
+pro_path=`echo ${pathLine} | cut -d \; -f 3`
+pro_type=`echo ${pathLine} | cut -d \; -f 4`
+if [ ${pro_type} = "deploy" ];then
+#git下载代码并更新
+git clone ${pro_path}
+if [[ ${pro_name} =~ "/" ]];then
+cd ${dependency_dir}/${pro_name%/*}
 else
-	echo "info: the "${project_name}" is not find a dependency.txt!"
+cd ${dependency_dir}/${pro_name}
 fi
-
-echo "rm -f \${BASEDIR}/lib_explanation.sh" >> ${WORKSPACE}/lib_explanation.sh
-
-###########################################
-#删除dependency文件夹，退回项目本身，开始构建目标项目
-###########################################
-echo "info: "${project_name}" build!"
-
-rm -rf ${BASEDIR}
-cd ${WORKSPACE}
-mvn -Dmaven.test.skip=true clean
-command_failed ${project_name}" clean failed!"
-
-projectName=${project_name}
-moduleName=${module_name}
-branchName=${branch_name}
-lastTag=${last_tag}
-
-if [ ${projectName} = ${moduleName} ]
-then
-	moduleBase=${WORKSPACE}
-else
-	moduleBase=${WORKSPACE}/${moduleName}
-fi
-
-excuteDir=$(find ${moduleBase} -name '*docker' | grep 'src' | head -n 1)
-
-###########################################
-#deploy到nexus使maven执行时能正确从nexus抓取依赖
-###########################################
-cd ${WORKSPACE}
-git stash
+git checkout ${pro_branch}
 git fetch
-git checkout origin/${branch_name}
-git pull origin ${branch_name}
-
-mvn -Dmaven.test.skip=true clean package -U install 
-command_failed ${project_name}" install failed!"
-
-mvn -Dmaven.test.skip=true deploy -DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ -DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/ 
-command_failed ${project_name}" deploy failed!"
-
-rm -rf $(find ./ -name "*.war")
-rm -rf $(find ./ -name "*.jar")
-
-###########################################
-#抓取master分支的zip包，解压代码至master目录,并package，获取旧版本lib
-###########################################
-echo "info: ${moduleName}.zip build!"
-
-mkdir -p ${moduleBase}/target/build
-buildDir="${moduleBase}/target/build"
-if [ -d ${moduleBase}/target/build ]
-then
-	rm -rf ${moduleBase}/target/build/*
+#进入到maven构建目录
+cd ${dependency_dir}/${pro_name}
+echo "info:${pro_name} ${pro_branch} 打包发布该分支!"
+#调用mvn构建项目,更新本地库，更新远端库
+mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true  -Dmaven.repo.local=${WORKSPACE}/maven_reprository \
+-DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ \
+-DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
+fi
+#退出到dependency_dir并删除目录下文件，避免git同一个项目目录冲突
+cd ${dependency_dir}
+rm -rf ${dependency_dir}/*
+done < ${dependency_path}
+else
+echo "warn:dependency.txt is not found!"
 fi
 
-cd ${buildDir}
-curl -o master.zip "http://192.168.1.215:9090/zip/?r=joinwe/${projectName}.git&h=master&format=zip"
-unzip -q -d ${buildDir}/master master.zip
-rm -f ${buildDir}/master.zip
-
-if [ ${projectName} = ${moduleName} ]
-then
-	mkdir -p ${buildDir}/master/${moduleName}
-	cd ${buildDir}/master
-	mv $(ls | grep -v ${moduleName}) ${buildDir}/master/${moduleName}
+# 删除dependency_dir
+rm -rf ${dependency_dir}
+#------------------------------------------------------------------------------
+#step 3
+#------------------------------------------------------------------------------
+#当项目第一次发布时没有master分支，也没有last_tag,所以last_tag与branch_name相同
+if [ ${branch_name} != ${last_tag#*/} ];then
+project_tag="patch" #以发布过，有master分支，有tag分支，有patch包
+elif [[ ${branch_name} = ${last_tag#*/} ||  ${last_tag} ]];then
+project_tag="full" #未发布过，没有master分支，没有tag分支,没有patch包
 fi
+#------------------------------------------------------------------------------
+#下载master.zip并解压到master_dir,当前未编译
+case ${project_tag} in
+'patch')
+curl -o "${master_zip_path}" "${master_zip_url}"
+unzip -q -d "${master_dir}" "${master_zip_path}"
+rm -rf "${master_zip_path}"
 
-cd ${buildDir}/master/${moduleName}
-mvn -Dmaven.test.skip=true package -U install
-command_failed "master/${moduleName}  install failed!"
+#对比branch与master修改文件
+diff_file_list=($(diff -ruaq "${BASE_DIR}" "${master_dir}" \
+	| grep '^Files' | grep -v '\.git' | awk '{print $2}' ))
+#对比branch有，master没有的文件
+#屏蔽没有后缀的列，认为没有“.”的列为文件夹
+#屏蔽master的文件列，默认为master需要文件
+add_file_list=($(diff -ruaq "${BASE_DIR}" "${master_dir}" \
+	| grep '^Only' | grep "${BASE_DIR}" | grep -v '\.git' \
+	| awk '{print $3,$4;}' | sed 's/: /\//' ))
+	
+#屏蔽master的文件列，默认为master需要文件
+remove_file_list=($(diff -ruaq "${BASE_DIR}" "${master_dir}" \
+	| grep '^Only' | grep "${master_dir}" | grep -v '\.git' \
+	| awk '{print $3,$4;}' | sed 's/: /\//' ))
 
-cd ${buildDir}/master/${moduleName}/target/${moduleName}/WEB-INF/lib
-oldLibs=(*)
-
-###########################################
-#branch版本对比Tag版本生成修改文件列表，
-#compile,static,resource,pom。
-###########################################
-
-cd ${WORKSPACE}
-compileFileList=$(git diff ${lastTag} HEAD --name-only | grep ${moduleName}** | grep **.java)
-staticFileList=$(git diff ${lastTag} HEAD  --name-only --ignore-all-space | grep ${moduleName}/src/main/webapp/**.*)
-pomFileList=$(git diff ${lastTag} HEAD --name-only | grep **pom.xml)
-read -a array <<< ${compileFileList}
-read -a array_static <<< ${staticFileList}
-read -a array_pom <<< ${pomFileList}
-
-#将修改的.pom应用到master dir
-if [[ ${#array_pom[@]} != 0 ]]
-then
-	for i in ${!array_pom[@]};do
-		cp ${array_pom[$i]} ${buildDir}/master/${array_pom[$i]}
-	done
+#把branch的add\diff文件复制到master
+if [[ ${#diff_file_list[@]} != 0 ]];then
+for i in ${!diff_file_list[@]};do
+dir_path="${diff_file_list[$i]/${BASE_DIR}/${master_dir}}"
+mkdir -p $(dirname "${dir_path}")
+if [ -d ${diff_file_list[$i]} ];then
+continue
 fi
-
-cd ${moduleBase}
-resourceFileList=$(git diff ${lastTag} HEAD --name-only | grep ${moduleName}/src/main/resources/**.*)
-read -a array_resource <<< ${resourceFileList}
-
-#将修改的.java打包成patch.zip
-if [[ $(echo ${compileFileList}) != "" ]]
-then
-	cd ${WORKSPACE}
-	zip -q ${buildDir}/patch.zip ${compileFileList}
-fi
-
-###########################################
-#升级包patch.zip覆盖至master dir并编译
-###########################################
-if [ ! -f ${buildDir}"/patch.zip" ]
-then
-	cd ${buildDir}
-	unzip -q -o patch.zip -d master
-	rm -rf patch.zip
-fi
-cd ${buildDir}/master/${moduleName}
-mvn -Dmaven.test.skip=true compile 
-command_failed "master/${moduleName} compile failed!"
-
-###########################################
-#提取master dir编译后的class文件到升级包
-#提取变更的静态文件到升级包,并覆盖至master dir代码
-###########################################
-echo "info: copy changed file to master/${moduleName}!"
-
-javaSuffix=.java
-classSuffix=.class
-
-if [[ ${#array[@]} != 0 ]]
-then
-	for i in ${!array[@]};do
-		mkdir -p $(dirname ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15})
-		#cp ${buildDir}/master/${moduleName}/target/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15:-${#javaSuffix}}$classSuffix
-		cp ${buildDir}/master/${moduleName}/target/classes/${array[$i]:${#moduleName}+15:${#array[$i]}-(${#moduleName}+15)-${#javaSuffix}}${classSuffix} ${buildDir}/${moduleName}/WEB-INF/classes/${array[$i]:${#moduleName}+15:${#array[$i]}-(${#moduleName}+15)-${#javaSuffix}}${classSuffix}
+cp "${diff_file_list[$i]}" "${dir_path}"
 done
 fi
 
-if [[ ${#array_static[@]} != 0 ]]
-then
-	for i in ${!array_static[@]};do
-		mkdir -p $(dirname ${buildDir}/${moduleName}/${array_static[$i]:${#moduleName}+17})
-		cp ${WORKSPACE}/${array_static[$i]} ${buildDir}/${moduleName}/${array_static[$i]:${#moduleName}+17}
-		cp ${WORKSPACE}/${array_static[$i]} ${buildDir}/master/${array_static[$i]}
+if [[ ${#add_file_list[@]} != 0 ]];then
+	for i in ${!add_file_list[@]};do
+		dir_path="${add_file_list[$i]/${BASE_DIR}/${master_dir}}"
+		if [ -d ${add_file_list[$i]} ];then
+			mkdir -p "${dir_path}"
+			cp -r "${add_file_list[$i]}" "${dir_path}"
+		else
+			mkdir -p $(dirname "${dir_path}")
+			cp "${add_file_list[$i]}" "${dir_path}"
+		fi
 	done
 fi
 
-if [[ ${#array_static[@]} != 0 ]]
-then
-	for i in ${!array_resource[@]};do
-		mkdir -p $(dirname ${buildDir}/${moduleName}/WEB-INF/classes/${array_resource[$i]:${#moduleName}+20})
-		cp ${WORKSPACE}/${array_resource[$i]} ${buildDir}/${moduleName}/WEB-INF/classes/${array_resource[$i]:${#moduleName}+20}
-		cp ${WORKSPACE}/${array_resource[$i]} ${buildDir}/master/${array_resource[$i]}
-	done
+if [[ ${#remove_file_list[@]} != 0 ]];then
+for i in ${!remove_file_list[@]};do
+if [[ -d "${remove_file_list[$i]}" ]];then
+continue
 fi
-
-###########################################
-#master重新编译并打war包
-#将当前分支的docker目录覆盖至master代码
-#构建镜像推送至215服务器
-###########################################
-echo "info: again build master/${moduleName}!"
-cd ${buildDir}/master/${moduleName}
-mvn -Dmaven.test.skip=true package -U
-command_failed "master/${moduleName} package failed!"
-cp -r ${excuteDir} ${buildDir}/master/${moduleName}/src/main
-mvn -Dmaven.test.skip=true docker:build -DpushImage
-command_failed "master/${moduleName} docker push failed!"
-
-cd ${buildDir}/master/${moduleName}/target/docker/
-rm -rf $(find ./ -name "*.war")
-###########################################
-#创建增量文件$moduleName.zip
-###########################################
-echo "info: master/${moduleName}/**/lib/*.jar and ${moduleName}/**/lib/*.jar comparison!"
-cd ${buildDir}/master/${moduleName}/target/${moduleName}/WEB-INF/lib
-libs=(*)
-difLibs=()
-
-#对比新增jar
-for i in ${libs[@]}; do
-	skip=
-	for j in ${oldLibs[@]}; do
-	    [[ $i == $j ]] && { skip=1; break; }
-	done
-	[[ -n $skip ]] || difLibs+=("$i")
+rm -f "${remove_file_list[$i]}"
 done
+fi
+#master_dir进行打包
+cd "${master_dir}"
+mvn clean package install deploy -B -e -U -Dmaven.test.skip=true  -Dmaven.repo.local=${WORKSPACE}/maven_reprository \
+-DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ \
+-DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
+#master_dir进行docker image构建并上传
+if [ ! -d  "${master_dir}/${module_name}" ];then
+cd "${master_dir}"
+else
+cd "${master_dir}/${module_name}"
+fi
+mvn docker:build -q -e -Dmaven.test.skip=true -DpushImage 
+#------------------------------------------------------------------------------
+#下载last.zip并解压到last_dir,当前未编译
+curl -o "${last_tag_zip_path}" "${last_tag_zip_url}"
+unzip -q -d "${last_dir}" "${last_tag_zip_path}"
+rm -rf "${last_tag_zip_path}"
+#last_dir进行打包
+if [ ! -d "${last_dir}/${module_name}" ];then
+cd "${last_dir}"
+last_web_dir="${last_dir}"
+else
+cd "${last_dir}/${module_name}"
+last_web_dir="${last_dir}/${module_name}"
+fi
+mvn clean package -q -Dmaven.test.skip=true
 
-mkdir -p ${buildDir}/${moduleName}/WEB-INF/lib
+#对比master与last编译后修改文件
+patch_diff_file_list=($(diff -ruaq "${master_dir}/${module_name}/target/${module_name}" \
+	"${last_web_dir}/target/${module_name}" \
+	| grep '^Files' | grep -v '\.git' | awk '{print $2}'))
+#对比master编译后有，last编译后last没有的文件
+#屏蔽没有后缀的列，认为没有“.”的列为文件夹
+patch_add_file_list=($(diff -ruaq "${master_dir}/${module_name}/target/${module_name}" \
+	"${last_web_dir}/target/${module_name}" \
+	| grep '^Only' | grep "${master_dir}" | grep -v '\.git' \
+	| awk  '{print $3,$4;}' | sed 's/: /\//'))
 
-if [[ ${#difLibs[@]} != 0 ]]
-then
-	rm -rf ${buildDir}/${moduleName}/WEB-INF/lib/*
-	for i in ${difLibs[@]}; do
-		cp $i ${buildDir}/${moduleName}/WEB-INF/lib
-	done
+#把master的add\diff文件复制到patch
+if [[ ${#patch_diff_file_list[@]} != 0 ]];then
+for i in ${!patch_diff_file_list[@]};do
+dir_path="${patch_diff_file_list[$i]/"${master_dir}/${module_name}/target"/${patch_dir}}"
+mkdir -p $(dirname "${dir_path}")
+if [ -d ${patch_diff_file_list[$i]} ];then
+continue
+fi
+cp "${patch_diff_file_list[$i]}" "${dir_path}"
+done
 fi
 
-mv ${WORKSPACE}/lib_explanation.sh ${buildDir}/${moduleName}/WEB-INF/lib/lib_explanation.sh
+if [[ ${#patch_add_file_list[@]} != 0 ]];then
+	for i in ${!patch_add_file_list[@]};do
+		dir_path="${patch_add_file_list[$i]/"${master_dir}/${module_name}/target"/${patch_dir}}"
+		if [ -d ${patch_add_file_list[$i]} ];then
+			mkdir -p "${dir_path}"
+			cp -r "${patch_add_file_list[$i]}" "${dir_path}"
+		else
+			mkdir -p $(dirname "${dir_path}")
+			cp "${patch_add_file_list[$i]}" "${dir_path}"
+		fi
+	done
+fi
+#对比master编译后有，last编译后master没有的文件
+#屏蔽没有后缀的列，认为没有“.”的列为文件夹
+patch_remove_file_list=($(diff -ruaq "${master_dir}/${module_name}/target/${module_name}" \
+								"${last_web_dir}/target/${module_name}" \
+								| grep '^Only' | grep "${last_web_dir}" \
+								| awk  '{print $3,$4;}' | sed 's/: /\//'  \
+								| sed "s;"${last_web_dir}/target/${module_name}/";;"))
 
-###########################################
-#压缩增量包并上传（ftp，scp）到指定位置
-###########################################
-echo "info: compress the incremental package and upload it!"
-cd ${buildDir}
-zip -r -q "${moduleName}.zip" ${moduleName}/*
+if [[ ${#patch_remove_file_list[@]} != 0 ]];then
+for i in ${!patch_remove_file_list[@]};do
+if [[ -d "${last_web_dir}/target/${module_name}/${patch_remove_file_list[$i]}" ]];then
+continue
+fi
+echo "rm -f ${patch_remove_file_list[i]}" >> "${WORKSPACE}/explanation.sh"
+done
+fi
 
-###########################################
-#增量文件上传ftp
-#本地的${buildDir}/ to ftp服务器上的/home/data
-#ftp -n<<!
-#open 192.168.1.215
-#user upload_admin 123456
-#hash
-#cd /home/data
-#lcd ${buildDir}/
-#prompt
-#put ${moduleName}".zip"
-#close
-#bye
-#!
-###########################################
+echo "rm -f \${BASEDIR}/explanation.sh" >> "${WORKSPACE}/explanation.sh"
+mv "${WORKSPACE}/explanation.sh" "${patch_dir}/${module_name}"
 
-scp "${buildDir}/${moduleName}.zip" "root@192.168.1.215:/home/test-version/joinwe/${moduleName}.zip"
-command_failed "backup file is failed!"
+cd "${patch_dir}"
+zip -r "${patch_name}" "${module_name}"
+#压缩增量包并上传（scp）到指定位置
+scp "${patch_dir}/${patch_name}" "root@192.168.1.215:/home/test-version/joinwe/${patch_name}"
 
-echo "info: success end!"
-exit 0
+rm -rf $(find ${master_dir} -name '*\.jar')
+rm -rf $(find ${master_dir} -name '*\.war')
+;;
+'full')
+#------------------------------------------------------------------------------
+#step 4
+#------------------------------------------------------------------------------
+#master_dir进行打包
+cd "${BASE_DIR}"
+mvn clean package install deploy -q -B -e -U -Dmaven.test.skip=true -Dmaven.repo.local=${WORKSPACE}/maven_reprository \
+-DaltReleaseDeploymentRepository=nexus-releases::default::http://192.168.1.222:8081/nexus/content/repositories/releases/ \
+-DaltSnapshotDeploymentRepository=nexus-snapshots::default::http://192.168.1.222:8081/nexus/content/repositories/snapshots/
+#master_dir进行docker image构建并上传
+if [ ! -d "${BASE_DIR}/${module_name}" ];then
+cd "${BASE_DIR}"
+else
+cd "${BASE_DIR}/${module_name}"
+fi
+mvn docker:build -q -Dmaven.test.skip=true -DpushImage
+rm -rf $(find ./ -name '*\.war'| head -n 1) 
+war_path=$(find ./ -name '*\.war'| head -n 1) 
+scp "${war_path}" "root@192.168.1.215:/home/test-version/joinwe/${war_path##*/}"
+;;
+esac

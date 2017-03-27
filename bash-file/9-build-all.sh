@@ -265,8 +265,8 @@ case ${dependencies_build} in
 	jq_dependencies=($(echo ${json_description} | jq "recurse(.dependencies[]) | .dependencies | tostring"))
 	for ((i=${#jq_dependencies[@]};i>0;i--));do
 		jq_i=`expr i-1`
-	jq_dependency=$(echo ${jq_dependencies[${jq_i}]} | jq "fromjson")
-	jq_dependency_length=$(echo ${jq_dependency} | jq length)
+		jq_dependency=$(echo ${jq_dependencies[${jq_i}]} | jq "fromjson")
+		jq_dependency_length=$(echo ${jq_dependency} | jq length)
 		if [ ${jq_dependency_length} > 0 ];then
 			for ((j=0;j<${jq_dependency_length};j++));do
 				#获取参数
@@ -342,7 +342,7 @@ case ${dependencies_build} in
 				#编译父项目
 				#发布项目到nexus仓库
 				fun_deploy_nexus "${build_context}" "${dependency_dir}/${jq_project}"
-				rm -rf "${dependency_dir}/${jq_project}"
+				rm -rf ${dependency_dir}/*
 			done
 		fi
 	done
@@ -396,7 +396,7 @@ case ${project_tag} in
 	#下载master分支
 	curl -o "${master_zip_path}" "${master_zip_url}"
 	unzip -q -d "${master_dir}" "${master_zip_path}"
-	rm -rf "${master_zip_path}"
+	rm -rf ${master_zip_path}
 	
 	#对比branch与master修改文件
 	diff_file_list=($(diff -ruaq "${base_dir}" "${master_dir}" \
@@ -519,7 +519,7 @@ case ${project_tag} in
 	last_tag_zip_path="${WORKSPACE}/last.zip"
 	curl -o "${last_tag_zip_path}" "${last_tag_zip_url}"
 	unzip -q -d "${last_dir}" "${last_tag_zip_path}"
-	rm -rf "${last_tag_zip_path}"
+	rm -rf ${last_tag_zip_path}
 	#找到last_web文件夹
 	if [ ${web_module} == ${project_name} ];then
 		last_web="${last_dir}"

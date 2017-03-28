@@ -466,7 +466,8 @@ case ${project_tag} in
 	#修改父pom文件版本号
 	fun_version_change "${build_context}" "${master_dir}"
 	#编译父项目
-	#fun_deploy_nexus "${build_context}" "${master_dir}"
+	fun_deploy_nexus "${build_context}" "${master_dir}"
+	
 	#修改子项目pom文件版本号
 	jq_sub_names=($(echo ${json_description} | jq '.modules | .[] | .name' | sed {s/\"//g}))
 	jq_sub_values=($(echo ${json_description} | jq '.modules | .[] | .version' | sed {s/\"//g}))
@@ -612,8 +613,10 @@ case ${project_tag} in
 	fi
 	#修改父pom文件版本号
 	fun_version_change "${build_context}" "${base_dir}"
+	
 	#编译父项目
-	#fun_deploy_nexus "${build_context}" "${base_dir}"
+	fun_deploy_nexus "${build_context}" "${base_dir}"
+	
 	#修改子项目pom文件版本号
 	jq_sub_names=($(echo ${json_description} | jq '.modules | .[] | .name' | sed {s/\"//g}))
 	jq_sub_values=($(echo ${json_description} | jq '.modules | .[] | .version' | sed {s/\"//g}))

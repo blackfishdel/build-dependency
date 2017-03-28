@@ -466,15 +466,13 @@ case ${project_tag} in
 	#修改父pom文件版本号
 	fun_version_change "${build_context}" "${master_dir}"
 	#编译父项目
-	fun_deploy_nexus "${build_context}" "${master_dir}"
+	#fun_deploy_nexus "${build_context}" "${master_dir}"
 	#修改子项目pom文件版本号
 	jq_sub_names=($(echo ${json_description} | jq '.modules | .[] | .name' | sed {s/\"//g}))
 	jq_sub_values=($(echo ${json_description} | jq '.modules | .[] | .version' | sed {s/\"//g}))
 	if [ ${#jq_sub_names[@]} != 0 ];then
 		for ((i=0;i<${#jq_sub_names[@]};i++));do
-			if [[ ${jq_sub_names[$i]} = ${project_name} && ${jq_sub_names[$i]} = ${web_module} ]];then
-				fun_version_change "${build_context}" "${master_dir}"
-			else
+			if [[ ${jq_sub_names[$i]} != ${project_name} || ${jq_sub_names[$i]} != ${web_module} ]];then
 				fun_version_change "${build_context}" "${master_dir}/${jq_sub_names[$i]}" 
 			fi
 		done
@@ -615,15 +613,13 @@ case ${project_tag} in
 	#修改父pom文件版本号
 	fun_version_change "${build_context}" "${base_dir}"
 	#编译父项目
-	fun_deploy_nexus "${build_context}" "${base_dir}"
+	#fun_deploy_nexus "${build_context}" "${base_dir}"
 	#修改子项目pom文件版本号
 	jq_sub_names=($(echo ${json_description} | jq '.modules | .[] | .name' | sed {s/\"//g}))
 	jq_sub_values=($(echo ${json_description} | jq '.modules | .[] | .version' | sed {s/\"//g}))
 	if [ ${#jq_sub_names[@]} != 0 ];then
 		for ((i=0;i<${#jq_sub_names[@]};i++));do
-			if [[ ${jq_sub_names[$i]} = ${project_name} && ${jq_sub_names[$i]} = ${web_module} ]];then
-				fun_version_change "${build_context}" "${base_dir}"
-			else
+			if [[ ${jq_sub_names[$i]} != ${project_name} || ${jq_sub_names[$i]} != ${web_module} ]];then
 				fun_version_change "${build_context}" "${base_dir}/${jq_sub_names[$i]}" 
 			fi
 		done
@@ -634,7 +630,7 @@ case ${project_tag} in
 		for ((i=0;i<${#jq_sub_names[@]};i++));do
 			echo "${base_dir}/${jq_sub_names[$i]}"
 			if [[ ${jq_sub_names[$i]} != ${project_name} || ${jq_sub_names[$i]} != ${web_module} ]];then
-				fun_deploy_nexus "${build_context}" "${master_dir}/${jq_sub_names[$i]}" 
+				fun_deploy_nexus "${build_context}" "${base_dir}/${jq_sub_names[$i]}" 
 			fi
 		done
 	fi
@@ -662,6 +658,6 @@ case ${project_tag} in
 	rm -rf $(find ./ -name '*\.war'| grep "docker")
 	war_path=$(find ./ -name '*\.war' | head -n 1)
 	#压缩增量包并上传（scp）到指定服务器备份
-	fun_backup_file "${war_path}"d
+	fun_backup_file "${war_path}"
 	;;
 esac

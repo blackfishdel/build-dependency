@@ -95,24 +95,29 @@ esac
 #------------------------------------------------------------------------------
 fun_deploy_nexus(){
 cd ${2}
+pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
+if [ ! ${pompath} ];then
+	echo "info:pom.xml is did not find!"
+	return 0;
+fi
 case ${1} in
 "dev")
-mvn install deploy -q -B -e -U -Dmaven.test.skip=true \
+mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
 -Dmaven.repo.local="${maven_repository}" \
 -DaltSnapshotDeploymentRepository="nexus-snapshots::default::${snapshots_url}"
 ;;
 "sit")
-mvn install deploy -q -B -e -U -Dmaven.test.skip=true \
+mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
 -Dmaven.repo.local="${maven_repository}" \
 -DaltReleaseDeploymentRepository="nexus-snapshots::default::${alpha_url}"
 ;;
 "uat")
-mvn install deploy -q -B -e -U -Dmaven.test.skip=true \
+mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
 -Dmaven.repo.local="${maven_repository}" \
 -DaltReleaseDeploymentRepository="nexus-snapshots::default::${beta_url}"
 ;;
 "pro")
-mvn install deploy -q -B -e -U -Dmaven.test.skip=true \
+mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
 -Dmaven.repo.local="${maven_repository}" \
 -DaltReleaseDeploymentRepository="nexus-snapshots::default::${releases_url}"
 ;;
@@ -332,8 +337,25 @@ for ((i=${#jq_dependencies[@]};i>0;i--));do
 				fi
 			fi
 			
-			#父项目整体打包上传到nexus
-			#fun_deploy_nexus "${build_context}" "${dependency_dir}/${jq_project}"
+			#父项目打包上传到nexus
+			fun_deploy_nexus "${build_context}" "${dependency_dir}/${jq_project}"
+			
+			#判断父pom是否有子项目
+			if [[ $(echo ${jq_dependency} | jq ".[${j}] | .modules") && \
+				$(echo ${jq_dependency} | jq ".[${j}] | .modules") != "null" ]];then
+				#获取参数
+				jq_sub_names=($(echo ${jq_dependency} \
+					| jq ".[${j}] | .modules | .[] | .name" | sed {s/\"//g}))
+				jq_sub_values=($(echo ${jq_dependency} \
+					| jq ".[${j}] | .modules | .[] | .version" | sed {s/\"//g}))
+				#子项目打包上传到nexus
+				if [ ${#jq_sub_names[@]} != 0 ];then
+					for ((k=0;k<${#jq_sub_names[@]};k++));do
+						fun_deploy_nexus "${build_context}" \
+						"${dependency_dir}/${jq_project}/${jq_sub_names[${k}]}"
+					done
+				fi
+			fi
 			
 			#删除该项目文件夹
 			rm -rf ${dependency_dir}/*
@@ -477,6 +499,15 @@ fi
 #父项目整体编译打包并上传到nexus
 fun_deploy_nexus "${build_context}" "${master_dir}"
 
+#修改子项目pom版本号
+if [ ${#jq_sub_names[@]} != 0 ];then
+	for ((i=0;i<${#jq_sub_names[@]};i++));do
+		if [[ ${jq_sub_names[$i]} != ${project_name} || ${jq_sub_names[$i]} != ${web_module} ]];then
+			fun_deploy_nexus "${build_context}" "${master_dir}/${jq_sub_names[$i]}"
+		fi
+	done
+fi
+
 #master_dir进行docker image构建并上传到docker registry
 if [ ${web_module} == ${project_name} ];then
 	master_web="${master_dir}"
@@ -607,8 +638,17 @@ if [ ${#jq_sub_names[@]} != 0 ];then
 	done
 fi
 
-#父项目整体编译打包并上传到nexus
+#父项目编译打包并上传到nexus
 fun_deploy_nexus "${build_context}" "${base_dir}"
+
+#子项目编译打包并上传到nexus
+if [ ${#jq_sub_names[@]} != 0 ];then
+	for ((i=0;i<${#jq_sub_names[@]};i++));do
+		if [[ ${jq_sub_names[$i]} != ${project_name} || ${jq_sub_names[$i]} != ${web_module} ]];then
+			fun_deploy_nexus "${build_context}" "${base_dir}/${jq_sub_names[$i]}" 
+		fi
+	done
+fi
 
 #base_dir进行docker image构建并上传
 if [ ${web_module} == ${project_name} ];then

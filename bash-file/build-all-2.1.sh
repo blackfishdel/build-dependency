@@ -308,6 +308,7 @@ case ${dependencies_build} in
 				fun_version_change "${build_context}" "${dependency_dir}/${jq_project}"
 				#编译父项目
 				fun_deploy_nexus "${build_context}" "${dependency_dir}/${jq_project}"
+				
 				if [[ $(echo ${jq_dependency} | jq ".[${j}] | .modules") && \
 					$(echo ${jq_dependency} | jq ".[${j}] | .modules") != "null" ]];then
 					#修改子项目pom文件版本号

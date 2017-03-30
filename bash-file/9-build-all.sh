@@ -430,7 +430,7 @@ case ${project_tag} in
 			if [ -d ${add_file_list[$i]} ];then
 				dir_path="${add_file_list[$i]/${base_dir}/${master_dir}}"
 				mkdir -p "${dir_path}"
-				cp -r "${add_file_list[$i]}" "${dir_path}"
+				cp -r "${add_file_list[$i]}" $(dirname "${dir_path}")
 			else
 				dir_path="${add_file_list[$i]/${base_dir}/${master_dir}}"
 				mkdir -p $(dirname "${dir_path}")
@@ -561,7 +561,7 @@ case ${project_tag} in
 			if [ -d ${patch_add_file_list[$i]} ];then
 				dir_path="${patch_add_file_list[$i]/"${master_web}/target"/${patch_dir}}"
 				mkdir -p "${dir_path}"
-				cp -r "${patch_add_file_list[$i]}" "${dir_path}"
+				cp -r "${patch_add_file_list[$i]}" $(dirname "${dir_path}")
 			else
 				dir_path="${patch_add_file_list[$i]/"${master_web}/target"/${patch_dir}}"
 				mkdir -p $(dirname "${dir_path}")

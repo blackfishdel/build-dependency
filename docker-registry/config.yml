@@ -7,12 +7,13 @@ storage:
     blobdescriptor: inmemory
   filesystem:
     rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
 http:
   addr: :5000
   host: http://zkpregistry.com:5000
   headers:
     X-Content-Type-Options: [nosniff]
-  
 health:
   storagedriver:
     enabled: true

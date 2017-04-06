@@ -12,4 +12,4 @@ pacth.zip -> master -> compile -> *.class -> project_name/ ->project_name.zip
 
 sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat/jenkins.repo
 
-#运行shell为bash-file文件夹下build-all-2.2.sh
+#  运行shell为bash-file文件夹下build-all-2.2.sh

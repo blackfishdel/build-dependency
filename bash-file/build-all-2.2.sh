@@ -27,6 +27,11 @@ releases_url="${maven_base_url}releases/"
 #------------------------------------------------------------------------------
 fun_version_change(){
 cd ${2}
+pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
+if [ ! ${pompath} ];then
+	echo "info:pom.xml is did not find!"
+	return 0;
+fi
 case ${1} in
 "dev")
 ;;
@@ -68,6 +73,11 @@ esac
 #------------------------------------------------------------------------------
 fun_dependency_change(){
 cd ${2}
+pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
+if [ ! ${pompath} ];then
+	echo "info:pom.xml is did not find!"
+	return 0;
+fi
 case ${1} in
 "dev")
 echo "info:dev is not change!"

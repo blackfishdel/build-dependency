@@ -5,8 +5,11 @@
 
 ## 如何比较目标项目的2个版本
 通过 branch	-> master
+<br />
 tag	-> master
+<br />
 branch != tag -> pacth.zip
+<br />
 pacth.zip -> master -> compile -> *.class -> project_name/ ->project_name.zip
 
 ```

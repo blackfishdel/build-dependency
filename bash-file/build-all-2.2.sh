@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 #------------------------------------------------------------------------------
 #variable
@@ -29,7 +29,7 @@ fun_version_change(){
 cd ${2}
 pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
 if [ ! ${pompath} ];then
-	echo "info:pom.xml is did not find!"
+	echo "warn:pom.xml is did not find!"
 	return 0;
 fi
 case ${1} in
@@ -75,12 +75,12 @@ fun_dependency_change(){
 cd ${2}
 pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
 if [ ! ${pompath} ];then
-	echo "info:pom.xml is did not find!"
+	echo "warn:pom.xml is did not find!"
 	return 0;
 fi
 case ${1} in
 "dev")
-echo "info:dev is not change!"
+echo "warn:dev is not change!"
 ;;
 "sit")
 mvn versions:update-property -q -B -e -U -Dmaven.test.skip=true \
@@ -107,7 +107,7 @@ fun_deploy_nexus(){
 cd ${2}
 pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
 if [ ! ${pompath} ];then
-	echo "info:pom.xml is did not find!"
+	echo "warn:pom.xml is did not find!"
 	return 0;
 fi
 case ${1} in
@@ -132,6 +132,9 @@ mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
 -DaltReleaseDeploymentRepository="nexus-snapshots::default::${releases_url}"
 ;;
 esac
+if [ $? == 0 ];then
+	echo "warn:$(pwd) this project deploy failed!"
+fi
 }
 #------------------------------------------------------------------------------
 #名字:fun_package_pro
@@ -250,7 +253,7 @@ fi
 
 case ${description_find} in
 'not find')
-echo "info:build.json is did not find!"
+echo "warn:build.json is did not find!"
 ;;
 'find')
 json_description=$(cat ${description_path})
@@ -270,7 +273,7 @@ esac
 #------------------------------------------------------------------------------
 case ${dependencies_build} in
 "false")
-echo "info:This project does not need to dependencies!"
+echo "warn:This project does not need to dependencies!"
 ;;
 "true")
 cd ${WORKSPACE}
@@ -348,8 +351,9 @@ for ((i=${#jq_dependencies[@]};i>0;i--));do
 			fi
 			
 			#父项目打包上传到nexus
+			set +e
 			fun_deploy_nexus "${build_context}" "${dependency_dir}/${jq_project}"
-			
+			set -e
 			#判断父pom是否有子项目
 			if [[ $(echo ${jq_dependency} | jq ".[${j}] | .modules") && \
 				$(echo ${jq_dependency} | jq ".[${j}] | .modules") != "null" ]];then
@@ -361,8 +365,10 @@ for ((i=${#jq_dependencies[@]};i>0;i--));do
 				#子项目打包上传到nexus
 				if [ ${#jq_sub_names[@]} != 0 ];then
 					for ((k=0;k<${#jq_sub_names[@]};k++));do
+						set +e
 						fun_deploy_nexus "${build_context}" \
 						"${dependency_dir}/${jq_project}/${jq_sub_names[${k}]}"
+						set -e
 					done
 				fi
 			fi

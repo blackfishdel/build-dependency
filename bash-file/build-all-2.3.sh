@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 #------------------------------------------------------------------------------
 #variable
@@ -30,35 +30,36 @@ pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
 if [ ! ${pompath} ];then
 	echo "[warn] ${2} pom.xml is did not find!"
 	return 0;
-fi
-case ${1} in
+else
+	case ${1} in
 "dev")
-;;
+	;;
 "sit")
-mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}' \
--DupdateMatchingVersions=false
-mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}-ALPHA' \
--DupdateMatchingVersions=false
-;;
+	mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
+	-DremoveSnapshot=true -DnewVersion='${project.version}' \
+	-DupdateMatchingVersions=false
+	mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
+	-DremoveSnapshot=true -DnewVersion='${project.version}-ALPHA' \
+	-DupdateMatchingVersions=false
+	;;
 "uat")
-mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}' \
--DupdateMatchingVersions=false
-mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}-BETA' \
--DupdateMatchingVersions=false
-;;
+	mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
+	-DremoveSnapshot=true -DnewVersion='${project.version}' \
+	-DupdateMatchingVersions=false
+	mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
+	-DremoveSnapshot=true -DnewVersion='${project.version}-BETA' \
+	-DupdateMatchingVersions=false
+	;;
 "pro")
-mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}' \
--DupdateMatchingVersions=false
-mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
--DremoveSnapshot=true -DnewVersion='${project.version}-RELEASE' \
--DupdateMatchingVersions=false
-;;
-esac
+	mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
+	-DremoveSnapshot=true -DnewVersion='${project.version}' \
+	-DupdateMatchingVersions=false
+	mvn versions:set -N -q -B -e -U -Dmaven.test.skip=true \
+	-DremoveSnapshot=true -DnewVersion='${project.version}-RELEASE' \
+	-DupdateMatchingVersions=false
+	;;
+	esac
+fi
 }
 #------------------------------------------------------------------------------
 #名字:fun_dependency_change
@@ -75,6 +76,7 @@ cd ${2}
 pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
 if [ ! ${pompath} ];then
 	echo "[warn] ${2} pom.xml is did not find!"
+	return 0;
 else
 	case ${1} in
 "dev")
@@ -107,6 +109,7 @@ cd ${2}
 pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
 if [ ! ${pompath} ];then
 	echo "[warn] ${2} pom.xml is did not find!"
+	return 0;
 else
 	case ${1} in
 "dev")
@@ -384,18 +387,13 @@ esac
 rm -rf ${dependency_dir}
 
 #------------------------------------------------------------------------------
-#create remove script
-#------------------------------------------------------------------------------
-fun_create_script
-
-#------------------------------------------------------------------------------
 #build target project
 #------------------------------------------------------------------------------
 cd ${WORKSPACE}
 project_name=$(echo ${json_description} | \
 	jq '.project_name' | sed {s/\"//g})
-web_module=$(echo ${json_description} | \
-	jq '.web_module' | sed {s/\"//g})
+web_modules=($(echo ${json_description} | \
+	jq '.web_module' | .[] | sed {s/\"//g}))
 last_tag=$(echo ${json_description} | \
 	jq '.last_tag' | sed {s/\"//g})
 
@@ -520,9 +518,7 @@ jq_sub_names=($(echo ${json_description} | jq '.modules | .[] | .name' | sed {s/
 #修改子项目pom版本号
 if [ ${#jq_sub_names[@]} != 0 ];then
 	for ((i=0;i<${#jq_sub_names[@]};i++));do
-		if [[ ${jq_sub_names[$i]} != ${project_name} || ${jq_sub_names[$i]} != ${web_module} ]];then
-			fun_version_change "${build_context}" "${master_dir}/${jq_sub_names[$i]}"
-		fi
+		fun_version_change "${build_context}" "${master_dir}/${jq_sub_names[$i]}"
 	done
 fi
 
@@ -532,110 +528,117 @@ fun_deploy_nexus "${build_context}" "${master_dir}"
 #修改子项目pom版本号
 if [ ${#jq_sub_names[@]} != 0 ];then
 	for ((i=0;i<${#jq_sub_names[@]};i++));do
-		if [[ ${jq_sub_names[$i]} != ${project_name} || ${jq_sub_names[$i]} != ${web_module} ]];then
-			fun_deploy_nexus "${build_context}" "${master_dir}/${jq_sub_names[$i]}"
-		fi
+		fun_deploy_nexus "${build_context}" "${master_dir}/${jq_sub_names[$i]}"
 	done
 fi
+#---test
+#---test
 
-#master_dir进行docker image构建并上传到docker registry
-if [ ${web_module} == ${project_name} ];then
-	master_web="${master_dir}"
-else
-	master_web="${master_dir}/${web_module}"
-fi
-fun_push_image ${master_web}
+#循环遍历web_modules数组
+for ((y=0;y<${#web_modules[@]};y++}));do
+	#create remove script
+	fun_create_script
+	
+	#master_dir进行docker image构建并上传到docker registry
+	if [ ${web_modules[y]} = ${project_name} ];then
+		master_web="${master_dir}"
+	else
+		master_web="${master_dir}/${web_modules[y]}"
+	fi
+	fun_push_image ${master_web}
 
-#------------------------------------------------------------------------------
-#生成patch包
-#------------------------------------------------------------------------------
-#下载last tag并解压到last_dir
-last_dir="${WORKSPACE}/last_dir"
-mkdir -p ${last_dir}
-last_tag_zip_url=$(fun_zip_url ${project_name} ${last_tag})
-last_tag_zip_path="${WORKSPACE}/last.zip"
-curl -o "${last_tag_zip_path}" "${last_tag_zip_url}"
-unzip -q -d "${last_dir}" "${last_tag_zip_path}"
-rm -rf ${last_tag_zip_path}
+	#------------------------------------------------------------------------------
+	#生成patch包
+	#------------------------------------------------------------------------------
+	#下载last tag并解压到last_dir
+	last_dir="${WORKSPACE}/last_dir"
+	mkdir -p ${last_dir}
+	last_tag_zip_url=$(fun_zip_url ${project_name} ${last_tag})
+	last_tag_zip_path="${WORKSPACE}/last.zip"
+	curl -o "${last_tag_zip_path}" "${last_tag_zip_url}"
+	unzip -q -d "${last_dir}" "${last_tag_zip_path}"
+	rm -rf ${last_tag_zip_path}
 	#找到last_web文件夹
-if [ ${web_module} == ${project_name} ];then
-	last_web="${last_dir}"
-else
-	last_web="${last_dir}/${web_module}"
-fi
-#对last_web进行编译
-fun_package_pro ${last_dir}
-#------------------------------------------------------------------------------
-#对比master与last编译后修改文件
-patch_diff_file_list=($(diff -ruaq "${master_web}/target/${web_module}" \
-		"${last_web}/target/${web_module}" \
+	if [ ${web_modules[y]} == ${project_name} ];then
+		last_web="${last_dir}"
+	else
+		last_web="${last_dir}/${web_modules[y]}"
+	fi
+	#对last_web进行编译
+	fun_package_pro ${last_dir}
+	#------------------------------------------------------------------------------
+	#对比master与last编译后修改文件
+	patch_diff_file_list=($(diff -ruaq "${master_web}/target/${web_modules[y]}" \
+		"${last_web}/target/${web_modules[y]}" \
 		| grep '^Files' | grep -v '\.git' | awk '{print $2}'))
-#对比master编译后有，last编译后last没有的文件
-#屏蔽没有后缀的列，认为没有“.”的列为文件夹
-patch_add_file_list=($(diff -ruaq "${master_web}/target/${web_module}" \
-		"${last_web}/target/${web_module}" \
+	#对比master编译后有，last编译后last没有的文件
+	#屏蔽没有后缀的列，认为没有“.”的列为文件夹
+	patch_add_file_list=($(diff -ruaq "${master_web}/target/${web_modules[y]}" \
+		"${last_web}/target/${web_modules[y]}" \
 		| grep '^Only' | grep "${master_dir}" | grep -v '\.git' \
 		| awk  '{print $3,$4;}' | sed 's/: /\//'))
 
-#创建patch_dir文件夹
-patch_dir="${WORKSPACE}/patch"
-patch_name="${module_name}.zip"
-mkdir -p ${patch_dir}
+	#创建patch_dir文件夹
+	patch_dir="${WORKSPACE}/patch"
+	patch_name="${web_modules[y]}.zip"
+	mkdir -p ${patch_dir}
 
-#把master_dir的add\diff文件复制到patch_dir
-if [[ ${#patch_diff_file_list[@]} != 0 ]];then
-	for i in ${!patch_diff_file_list[@]};do
-		dir_path="${patch_diff_file_list[$i]/"${master_web}/target"/${patch_dir}}"
-		mkdir -p $(dirname "${dir_path}")
-		if [ -d ${patch_diff_file_list[$i]} ];then
-			continue
-		fi
-		cp "${patch_diff_file_list[$i]}" "${dir_path}"
-	done
-fi
-
-if [[ ${#patch_add_file_list[@]} != 0 ]];then
-	for i in ${!patch_add_file_list[@]};do
-		if [ -d ${patch_add_file_list[$i]} ];then
-			dir_path="${patch_add_file_list[$i]/"${master_web}/target"/${patch_dir}}"
-			mkdir -p "${dir_path}"
-			cp -r "${patch_add_file_list[$i]}" $(dirname "${dir_path}")
-		else
-			dir_path="${patch_add_file_list[$i]/"${master_web}/target"/${patch_dir}}"
+	#把master_dir的add\diff文件复制到patch_dir
+	if [[ ${#patch_diff_file_list[@]} != 0 ]];then
+		for i in ${!patch_diff_file_list[@]};do
+			dir_path="${patch_diff_file_list[$i]/"${master_web}/target"/${patch_dir}}"
 			mkdir -p $(dirname "${dir_path}")
-			cp "${patch_add_file_list[$i]}" "${dir_path}"
-		fi
-	done
-fi
+			if [ -d ${patch_diff_file_list[$i]} ];then
+				continue
+			fi
+			cp "${patch_diff_file_list[$i]}" "${dir_path}"
+		done
+	fi
 
-#对比master_dir编译后有，last_dir编译后master_dir没有的文件
-#屏蔽没有后缀的列，认为没有“.”的列为文件夹
-patch_remove_file_list=($(diff -ruaq "${master_web}/target/${web_module}" \
-									"${last_web}/target/${web_module}" \
+	if [[ ${#patch_add_file_list[@]} != 0 ]];then
+		for i in ${!patch_add_file_list[@]};do
+			if [ -d ${patch_add_file_list[$i]} ];then
+				dir_path="${patch_add_file_list[$i]/"${master_web}/target"/${patch_dir}}"
+				mkdir -p "${dir_path}"
+				cp -r "${patch_add_file_list[$i]}" $(dirname "${dir_path}")
+			else
+				dir_path="${patch_add_file_list[$i]/"${master_web}/target"/${patch_dir}}"
+				mkdir -p $(dirname "${dir_path}")
+				cp "${patch_add_file_list[$i]}" "${dir_path}"
+			fi
+		done
+	fi
+
+	#对比master_dir编译后有，last_dir编译后master_dir没有的文件
+	#屏蔽没有后缀的列，认为没有“.”的列为文件夹
+	patch_remove_file_list=($(diff -ruaq "${master_web}/target/${web_modules[y]}" \
+									"${last_web}/target/${web_modules[y]}" \
 									| grep '^Only' | grep "${last_web}" \
 									| awk  '{print $3,$4;}' | sed 's/: /\//'  \
-									| sed "s;"${last_web}/target/${web_module}/";;"))
+									| sed "s;"${last_web}/target/${web_modules[y]}/";;"))
 
-if [[ ${#patch_remove_file_list[@]} != 0 ]];then
-	for i in ${!patch_remove_file_list[@]};do
-		if [[ -d "${last_web}/target/${web_module}/${patch_remove_file_list[$i]}" ]];then
-			continue
-		fi
-		fun_superadd_script "rm -f ${patch_remove_file_list[i]}"
-	done
-fi
+	if [[ ${#patch_remove_file_list[@]} != 0 ]];then
+		for i in ${!patch_remove_file_list[@]};do
+			if [[ -d "${last_web}/target/${web_modules[y]}/${patch_remove_file_list[$i]}" ]];then
+				continue
+			fi
+			fun_superadd_script "rm -f ${patch_remove_file_list[i]}"
+		done
+	fi
 
-mv "${WORKSPACE}/remove_file.sh" "${patch_dir}/${web_module}"
+	mv "${WORKSPACE}/remove_file.sh" "${patch_dir}/${web_modules[y]}"
 
-#压缩patch_dir
-cd "${patch_dir}"
-zip -r "${WORKSPACE}/${web_module}.zip" ./
-#压缩增量包并上传（scp）到指定服务器备份
-fun_backup_file "${WORKSPACE}/${web_module}.zip"
+	#压缩patch_dir
+	cd "${patch_dir}"
+	zip -r "${WORKSPACE}/${web_modules[y]}.zip" "./${web_modules[y]}"
+	#压缩增量包并上传（scp）到指定服务器备份
+	fun_backup_file "${WORKSPACE}/${web_modules[y]}.zip"
+done
 #删除编译后文件
 rm -rf $(find ${WORKSPACE} -name '*\.jar')
 rm -rf $(find ${WORKSPACE} -name '*\.war')
 ;;
+
 'full')
 #------------------------------------------------------------------------------
 cd ${base_dir}
@@ -677,9 +680,7 @@ jq_sub_names=($(echo ${json_description} | jq '.modules | .[] | .name' | sed {s/
 #修改子项目pom版本号
 if [ ${#jq_sub_names[@]} != 0 ];then
 	for ((i=0;i<${#jq_sub_names[@]};i++));do
-		if [[ ${jq_sub_names[$i]} != ${project_name} || ${jq_sub_names[$i]} != ${web_module} ]];then
-			fun_version_change "${build_context}" "${base_dir}/${jq_sub_names[$i]}" 
-		fi
+		fun_version_change "${build_context}" "${base_dir}/${jq_sub_names[$i]}" 
 	done
 fi
 
@@ -689,25 +690,26 @@ fun_deploy_nexus "${build_context}" "${base_dir}"
 #子项目编译打包并上传到nexus
 if [ ${#jq_sub_names[@]} != 0 ];then
 	for ((i=0;i<${#jq_sub_names[@]};i++));do
-		if [[ ${jq_sub_names[$i]} != ${project_name} || ${jq_sub_names[$i]} != ${web_module} ]];then
-			fun_deploy_nexus "${build_context}" "${base_dir}/${jq_sub_names[$i]}" 
-		fi
+		fun_deploy_nexus "${build_context}" "${base_dir}/${jq_sub_names[$i]}" 
 	done
 fi
 
-#base_dir进行docker image构建并上传
-if [ ${web_module} == ${project_name} ];then
-	base_web="${base_dir}"
-else
-	base_web="${base_dir}/${web_module}"
-fi
-fun_push_image ${base_web}
-
-#删除编译后文件
-rm -rf $(find ./ -name '*\.war'| grep "docker")
-war_path=$(find ./ -name '*\.war' | head -n 1)
-
-#压缩增量包并上传（scp）到指定服务器备份
-fun_backup_file "${war_path}"
+#循环遍历web_modules数组
+for ((i=0;i<${#web_modules[@]};i++}));do
+	#base_dir进行docker image构建并上传
+	if [ ${web_modules[i]} == ${project_name} ];then
+		base_web="${base_dir}"
+	else
+		base_web="${base_dir}/${web_modules[i]}"
+	fi
+	fun_push_image ${base_web}
+	
+	#删除编译后文件
+	rm -rf $(find ./ -name '*\.war'| grep "docker")
+	war_path=$(find ./ -name '*\.war' | head -n 1)
+	
+	#压缩增量包并上传（scp）到指定服务器备份
+	fun_backup_file "${war_path}"
+done
 ;;
 esac

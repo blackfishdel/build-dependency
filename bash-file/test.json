@@ -1,0 +1,68 @@
+{
+	"project_name": "bssp",
+	"web_module": "bssp-service",
+	"last_tag": "v2.1.2-alpha-1",
+	"modules": 
+	[
+		{
+			"name": "bssp-message"
+		},
+
+		{
+			"name": "bssp-api"
+		},
+
+		{
+			"name": "bssp-service"
+		}
+	],
+
+	"dependencies": 
+	[
+		{
+			"project": "bacs",
+			"version": "1.1.2",
+			"branch": "dev",
+			"tag": "",
+			"modules": 
+			[
+				{
+					"name": "bacs-message",
+					"version": "1.1.2"
+				},
+
+				{
+					"name": "bacs-api",
+					"version": "1.1.2"
+				}
+			],
+
+			"dependencies": 
+			[
+				{
+					"project": "commons",
+					"version": "",
+					"branch": "dev",
+					"tag": "",
+					"modules": 
+					[
+						{
+							"name": "common-support",
+							"version": "2.0.4"
+						},
+
+						{
+							"name": "common-sce",
+							"version": "1.0.0"
+						}
+					],
+
+					"dependencies": 
+					[
+						
+					]
+				}
+			]
+		}
+	]
+}

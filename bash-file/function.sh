@@ -19,11 +19,23 @@
 #echo "$(pwd) close"
 
 
-array_test=('a' 'b' 'c')
-value_test='a'
+#array_test=('a' 'b' 'c')
+#value_test='a'
+#if [ ${value_test} !=  ${array_test[@]} ];then
+	#	echo 'true'
+#else
+	#	echo 'false'
+#fi
 
-if [ ${value_test} !=  ${array_test[@]} ];then
-	echo 'true'
-else
-	echo 'false'
-fi
+json_description=$(cat /home/delxie/Documents/git-repository/build-dependency/bash-file/build-2.3.json)
+
+
+project_name=$(echo ${json_description} | \
+	jq '.project_name' | sed {s/\"//g})
+	
+web_modules=($(echo ${json_description} | \
+	jq '.web_module | .[]' | sed {s/\"//g}))
+	
+	
+echo ${web_modules}
+

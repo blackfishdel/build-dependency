@@ -130,8 +130,8 @@ else
 	-DaltReleaseDeploymentRepository="nexus-snapshots::default::${releases_url}"
 	;;
 	esac
-	if [ $? = 0 ];then
-		echo "[warn] $(pwd) this project deploy failed!"
+	if [ $? != 0 ];then
+		echo "[warn] ${2} this project deploy failed!"
 	fi
 fi
 }

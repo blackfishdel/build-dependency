@@ -28,7 +28,7 @@ fun_version_change(){
 cd ${2}
 pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
 if [ ! ${pompath} ];then
-	echo "[warn] ${2} pom.xml is did not find!"
+	echo "[warn] fun_version_change to ${2} pom.xml is did not find!"
 	return 0;
 else
 	case ${1} in
@@ -60,6 +60,7 @@ else
 	;;
 	esac
 fi
+echo "[info] fun_version_change to ${2} success!"
 }
 #------------------------------------------------------------------------------
 #名字:fun_dependency_change
@@ -75,7 +76,7 @@ fun_dependency_change(){
 cd ${2}
 pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
 if [ ! ${pompath} ];then
-	echo "[warn] ${2} pom.xml is did not find!"
+	echo "[warn] fun_dependency_change to ${2} pom.xml is did not find!"
 	return 0;
 else
 	case ${1} in
@@ -96,6 +97,11 @@ else
 	;;
 	esac
 fi
+if [ $? != 0 ];then
+	echo "[warn] fun_dependency_change to ${2} this project deploy failed!"
+else
+	echo "[info] fun_dependency_change to ${2} success!"
+fi
 }
 #------------------------------------------------------------------------------
 #名字:fun_deploy_nexus
@@ -108,34 +114,35 @@ fun_deploy_nexus(){
 cd ${2}
 pompath=$(find ${2} -maxdepth 1 -name 'pom.xml')
 if [ ! ${pompath} ];then
-	echo "[warn] ${2} pom.xml is did not find!"
+	echo "[warn] fun_deploy_nexus to ${2} pom.xml is did not find!"
 	return 0;
-else
-	case ${1} in
+fi
+case ${1} in
 "dev")
-	mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
-	-Dmaven.repo.local="${maven_repository}" \
-	-DaltSnapshotDeploymentRepository="nexus-snapshots::default::${snapshots_url}"
-	;;
+mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
+-Dmaven.repo.local="${maven_repository}" \
+-DaltSnapshotDeploymentRepository="nexus-snapshots::default::${snapshots_url}"
+;;
 "sit")
-	mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
-	-Dmaven.repo.local="${maven_repository}" \
-	-DaltReleaseDeploymentRepository="nexus-snapshots::default::${alpha_url}"
-	;;
+mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
+-Dmaven.repo.local="${maven_repository}" \
+-DaltReleaseDeploymentRepository="nexus-snapshots::default::${alpha_url}"
+;;
 "uat")
-	mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
-	-Dmaven.repo.local="${maven_repository}" \
-	-DaltReleaseDeploymentRepository="nexus-snapshots::default::${beta_url}"
-	;;
+mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
+-Dmaven.repo.local="${maven_repository}" \
+-DaltReleaseDeploymentRepository="nexus-snapshots::default::${beta_url}"
+;;
 "pro")
-	mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
-	-Dmaven.repo.local="${maven_repository}" \
-	-DaltReleaseDeploymentRepository="nexus-snapshots::default::${releases_url}"
-	;;
-	esac
-	if [ $? = 0 ];then
-		echo "[warn] $(pwd) this project deploy failed!"
-	fi
+mvn install deploy -N -q -B -e -U -Dmaven.test.skip=true \
+-Dmaven.repo.local="${maven_repository}" \
+-DaltReleaseDeploymentRepository="nexus-snapshots::default::${releases_url}"
+;;
+esac
+if [ $? != 0 ];then
+	echo "[warn] fun_deploy_nexus to ${2} this project deploy failed!"
+else
+	echo "[info] fun_deploy_nexus to ${2} success!"
 fi
 }
 #------------------------------------------------------------------------------
@@ -148,6 +155,11 @@ fun_package_pro(){
 cd ${1}
 mvn clean package -q -B -e -U -Dmaven.test.skip=true \
 -Dmaven.repo.local="${maven_repository}"
+if [ $? != 0 ];then
+	echo "[warn] fun_package_pro to ${1} this project deploy failed!"
+else
+	echo "[info] fun_package_pro to ${1} success!"
+fi
 }
 #------------------------------------------------------------------------------
 #名字:fun_push_image
@@ -158,6 +170,11 @@ mvn clean package -q -B -e -U -Dmaven.test.skip=true \
 fun_push_image(){
 cd ${1}
 mvn docker:build -q -B -e -U -Dmaven.test.skip=true -DpushImage
+if [ $? != 0 ];then
+	echo "[warn] fun_push_image to ${1} this project deploy failed!"
+else
+	echo "[info] fun_push_image to ${1} success!"
+fi
 }
 #------------------------------------------------------------------------------
 #名字:fun_zip_url
@@ -282,7 +299,8 @@ cd ${WORKSPACE}
 dependency_dir="${WORKSPACE}/dependency_dir"
 mkdir -p ${dependency_dir}
 #递归遍历dependencies
-jq_dependencies=($(echo ${json_description} | jq "recurse(.dependencies[]) | .dependencies | tostring"))
+jq_dependencies=($(echo ${json_description} \
+	| jq "recurse(.dependencies[]) | .dependencies | tostring"))
 for ((i=${#jq_dependencies[@]};i>0;i--));do
 	jq_i=`expr i-1`
 	jq_dependency=$(echo ${jq_dependencies[${jq_i}]} | jq "fromjson")
@@ -376,7 +394,7 @@ for ((i=${#jq_dependencies[@]};i>0;i--));do
 			fi
 			
 			#删除该项目文件夹
-			rm -rf ${dependency_dir}/*
+			rm -rf '${dependency_dir}/*'
 		done
 	fi
 done
@@ -393,7 +411,7 @@ cd ${WORKSPACE}
 project_name=$(echo ${json_description} | \
 	jq '.project_name' | sed {s/\"//g})
 web_modules=($(echo ${json_description} | \
-	jq '.web_module' | .[] | sed {s/\"//g}))
+	jq '.web_module | .[]' | sed {s/\"//g}))
 last_tag=$(echo ${json_description} | \
 	jq '.last_tag' | sed {s/\"//g})
 
@@ -535,7 +553,7 @@ fi
 #---test
 
 #循环遍历web_modules数组
-for ((y=0;y<${#web_modules[@]};y++}));do
+for ((y=0;y<${#web_modules[@]};y++));do
 	#create remove script
 	fun_create_script
 	
@@ -705,8 +723,9 @@ for ((i=0;i<${#web_modules[@]};i++}));do
 	fun_push_image ${base_web}
 	
 	#删除编译后文件
-	rm -rf $(find ./ -name '*\.war'| grep "docker")
-	war_path=$(find ./ -name '*\.war' | head -n 1)
+	cd ${base_web}
+	rm -rf $(find ./ -name "*\.war"| grep "docker")
+	war_path=$(find ./ -name "*\.war" | head -n 1)
 	
 	#压缩增量包并上传（scp）到指定服务器备份
 	fun_backup_file "${war_path}"

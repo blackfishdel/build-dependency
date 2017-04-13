@@ -549,8 +549,18 @@ if [ ${#jq_sub_names[@]} != 0 ];then
 		fun_deploy_nexus "${build_context}" "${master_dir}/${jq_sub_names[$i]}"
 	done
 fi
-#---test
-#---test
+
+#------------------------------------------------------------------------------
+
+#下载last tag并解压到last_dir
+last_dir="${WORKSPACE}/last_dir"
+mkdir -p ${last_dir}
+last_tag_zip_url=$(fun_zip_url ${project_name} ${last_tag})
+last_tag_zip_path="${WORKSPACE}/last.zip"
+curl -o "${last_tag_zip_path}" "${last_tag_zip_url}"
+unzip -q -d "${last_dir}" "${last_tag_zip_path}"
+rm -rf ${last_tag_zip_path}
+
 
 #循环遍历web_modules数组
 for ((y=0;y<${#web_modules[@]};y++));do
@@ -565,17 +575,8 @@ for ((y=0;y<${#web_modules[@]};y++));do
 	fi
 	fun_push_image ${master_web}
 
-	#------------------------------------------------------------------------------
 	#生成patch包
-	#------------------------------------------------------------------------------
-	#下载last tag并解压到last_dir
-	last_dir="${WORKSPACE}/last_dir"
-	mkdir -p ${last_dir}
-	last_tag_zip_url=$(fun_zip_url ${project_name} ${last_tag})
-	last_tag_zip_path="${WORKSPACE}/last.zip"
-	curl -o "${last_tag_zip_path}" "${last_tag_zip_url}"
-	unzip -q -d "${last_dir}" "${last_tag_zip_path}"
-	rm -rf ${last_tag_zip_path}
+
 	#找到last_web文件夹
 	if [ ${web_modules[y]} = ${project_name} ];then
 		last_web="${last_dir}"
@@ -583,14 +584,15 @@ for ((y=0;y<${#web_modules[@]};y++));do
 		last_web="${last_dir}/${web_modules[y]}"
 	fi
 	#对last_web进行编译
-	fun_package_pro ${last_dir}
+	fun_package_pro ${last_web}
+	
 	#------------------------------------------------------------------------------
+
 	#对比master与last编译后修改文件
 	patch_diff_file_list=($(diff -ruaq "${master_web}/target/${web_modules[y]}" \
 		"${last_web}/target/${web_modules[y]}" \
 		| grep '^Files' | grep -v '\.git' | awk '{print $2}'))
-	#对比master编译后有，last编译后last没有的文件
-	#屏蔽没有后缀的列，认为没有“.”的列为文件夹
+	#对比master编译后有，last编译后last没有的文件,屏蔽没有后缀的列，认为没有“.”的列为文件夹
 	patch_add_file_list=($(diff -ruaq "${master_web}/target/${web_modules[y]}" \
 		"${last_web}/target/${web_modules[y]}" \
 		| grep '^Only' | grep "${master_dir}" | grep -v '\.git' \
@@ -598,8 +600,11 @@ for ((y=0;y<${#web_modules[@]};y++));do
 
 	#创建patch_dir文件夹
 	patch_dir="${WORKSPACE}/patch"
-	patch_name="${web_modules[y]}.zip"
+	if [ -d ${patch_dir} ];then
+		rm -rf ${patch_dir}
+	fi
 	mkdir -p ${patch_dir}
+	patch_name="${web_modules[y]}.zip"
 
 	#把master_dir的add\diff文件复制到patch_dir
 	if [[ ${#patch_diff_file_list[@]} != 0 ]];then

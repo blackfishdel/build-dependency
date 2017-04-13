@@ -577,7 +577,7 @@ for ((y=0;y<${#web_modules[@]};y++));do
 	unzip -q -d "${last_dir}" "${last_tag_zip_path}"
 	rm -rf ${last_tag_zip_path}
 	#找到last_web文件夹
-	if [ ${web_modules[y]} == ${project_name} ];then
+	if [ ${web_modules[y]} = ${project_name} ];then
 		last_web="${last_dir}"
 	else
 		last_web="${last_dir}/${web_modules[y]}"
@@ -713,9 +713,9 @@ if [ ${#jq_sub_names[@]} != 0 ];then
 fi
 
 #循环遍历web_modules数组
-for ((i=0;i<${#web_modules[@]};i++}));do
+for ((i=0;i<${#web_modules[@]};i++));do
 	#base_dir进行docker image构建并上传
-	if [ ${web_modules[i]} == ${project_name} ];then
+	if [ ${web_modules[i]} = ${project_name} ];then
 		base_web="${base_dir}"
 	else
 		base_web="${base_dir}/${web_modules[i]}"

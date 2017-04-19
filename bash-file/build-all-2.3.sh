@@ -489,10 +489,7 @@ fi
 
 if [[ ${#remove_file_list[@]} != 0 ]];then
 	for i in ${!remove_file_list[@]};do
-		if [[ -d "${remove_file_list[$i]}" ]];then
-			continue
-		fi
-		rm -f "${remove_file_list[$i]}"
+		rm -rf "${remove_file_list[$i]}"
 	done
 fi
 #------------------------------------------------------------------------------
@@ -642,10 +639,7 @@ for ((y=0;y<${#web_modules[@]};y++));do
 
 	if [[ ${#patch_remove_file_list[@]} != 0 ]];then
 		for i in ${!patch_remove_file_list[@]};do
-			if [[ -d "${last_web}/target/${web_modules[y]}/${patch_remove_file_list[$i]}" ]];then
-				continue
-			fi
-			fun_superadd_script "rm -f ${patch_remove_file_list[i]}"
+			fun_superadd_script "rm -rf ${patch_remove_file_list[i]}"
 		done
 	fi
 

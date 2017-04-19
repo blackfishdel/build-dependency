@@ -473,9 +473,6 @@ fi
 
 if [[ ${#remove_file_list[@]} != 0 ]];then
 	for i in ${!remove_file_list[@]};do
-		if [[ -d "${remove_file_list[$i]}" ]];then
-			continue
-		fi
 		rm -f "${remove_file_list[$i]}"
 	done
 fi
@@ -618,10 +615,7 @@ patch_remove_file_list=($(diff -ruaq "${master_web}/target/${web_module}" \
 
 if [[ ${#patch_remove_file_list[@]} != 0 ]];then
 	for i in ${!patch_remove_file_list[@]};do
-		if [[ -d "${last_web}/target/${web_module}/${patch_remove_file_list[$i]}" ]];then
-			continue
-		fi
-		fun_superadd_script "rm -f ${patch_remove_file_list[i]}"
+		fun_superadd_script "rm -rf ${patch_remove_file_list[i]}"
 	done
 fi
 

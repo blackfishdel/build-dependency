@@ -1,59 +1,70 @@
 {
-	"project_name": "bssp",
-	"web_module": "bssp-service",
-	"last_tag": "v2.1.2-alpha-1",
+	"project_name": "zkp-pbms",
+	"web_module": "pbms-web",
+	"last_tag": "v1.3.5-release",
 	"modules": 
 	[
 		{
-			"name": "bssp-message"
-		},
-
-		{
-			"name": "bssp-api"
-		},
-
-		{
-			"name": "bssp-service"
+			"name": "pbms-web"
 		}
 	],
 
 	"dependencies": 
 	[
 		{
-			"project": "bacs",
-			"version": "1.1.2",
-			"branch": "dev",
+			"project": "zkp-pbap",
+			"version": "4.0.0",
+			"branch": "4.0.0-dev",
 			"tag": "",
 			"modules": 
 			[
 				{
-					"name": "bacs-message",
-					"version": "1.1.2"
+					"name": "pbap-bo",
+					"version": "4.0.0"
+				}
+			],
+
+			"dependencies": 
+			[
+				
+			]
+		},
+
+		{
+			"project": "bssp",
+			"version": "3.0.0",
+			"branch": "3.0.0-dev",
+			"tag": "",
+			"modules": 
+			[
+				{
+					"name": "bssp-message",
+					"version": "3.0.0"
 				},
 
 				{
-					"name": "bacs-api",
-					"version": "1.1.2"
+					"name": "bssp-api",
+					"version": "3.0.0"
 				}
 			],
 
 			"dependencies": 
 			[
 				{
-					"project": "commons",
-					"version": "",
-					"branch": "dev",
+					"project": "bacs",
+					"version": "2.0.0",
+					"branch": "2.0.0-dev",
 					"tag": "",
 					"modules": 
 					[
 						{
-							"name": "common-support",
-							"version": "2.0.4"
+							"name": "bacs-message",
+							"version": "2.0.0"
 						},
 
 						{
-							"name": "common-sce",
-							"version": "1.0.0"
+							"name": "bacs-api",
+							"version": "2.0.0"
 						}
 					],
 

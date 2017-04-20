@@ -394,7 +394,8 @@ for ((i=${#jq_dependencies[@]};i>0;i--));do
 			fi
 			
 			#删除该项目文件夹
-			rm -rf '${dependency_dir}/*'
+			cd ${dependency_dir}
+			rm -rf ${jq_project}
 		done
 	fi
 done
